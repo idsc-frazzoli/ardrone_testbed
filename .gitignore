@@ -27,9 +27,13 @@
 *.out
 *.app
 
+# Build folders
+devel/
+build/
+
+
+
 #Junk that came with ORBSLAM
-/Examples/
-Examples/*
 Examples/
 
 #Don't need bag files

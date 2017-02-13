@@ -1,2 +1,8 @@
-# ardrone_glc
-Testing GLC on the ardrone
+## AR drone workspace
+
+#Catkin Setup
+Clone the 
+
+'''
+git clone 
+'''
