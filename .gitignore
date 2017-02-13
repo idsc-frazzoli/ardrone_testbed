@@ -42,3 +42,5 @@ Examples/
 #file that is too big
 ORBvoc.txt
 
+#ide files
+*.kdev4
