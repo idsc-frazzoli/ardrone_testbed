@@ -37,11 +37,13 @@ using namespace std;
 class ImageGrabber
 {
 public:
-    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM){}
+    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), pc(){}
     
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
     
     ORB_SLAM2::System* mpSLAM;
+    
+    sensor_msgs::PointCloud pc;
 };
 
 int main(int argc, char **argv)
@@ -60,14 +62,21 @@ int main(int argc, char **argv)
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
     
     ImageGrabber igb(&SLAM);
-    //     std::vector<ORB_SLAM2::MapPoint*> test = igb.mpSLAM->mpMap->GetAllMapPoints();
-    //     std::cout << "HEY " << std::endl;
     
     ros::NodeHandle nodeHandler;
     ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
+    ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/environment/point_cloud", 2);
     
-    ros::spin();
+    ros::Rate loop_rate(30);
     
+    while (ros::ok()) {
+    
+      ros::spinOnce();
+      pub.publish(igb.pc);
+      loop_rate.sleep();
+    }
+    
+       
     // Stop all threads
     SLAM.Shutdown();
     
@@ -95,7 +104,9 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     //     Main slam routine
     mpSLAM->TrackMonocular(cv_ptr->image,cv_ptr->header.stamp.toSec());
     const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
-    sensor_msgs::PointCloud pc;
+    
+    // TODO: make efficient
+    pc.points.clear();
     for(size_t i=0; i<point_cloud.size();i++)
     {
         if(point_cloud[i]->isBad()/* or spRefMPs.count(vpMPs[i])*/)
