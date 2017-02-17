@@ -31,14 +31,16 @@
 #include<opencv2/core/core.hpp>
 
 #include"../../../include/System.h"
+#include <tf/transform_broadcaster.h>
 
 using namespace std;
 
 class ImageGrabber
 {
 public:
-    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), pc(){}
-    
+    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), pc(){
+        pc.header.frame_id= "/odom";
+    }
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
     
     ORB_SLAM2::System* mpSLAM;
@@ -88,8 +90,11 @@ int main(int argc, char **argv)
     return 0;
 }
 
+//callback
 void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 {
+    static tf::TransformBroadcaster br;
+    tf::Transform transform;
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptr;
     try
