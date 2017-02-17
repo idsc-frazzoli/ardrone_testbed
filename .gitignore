@@ -34,8 +34,8 @@ build/
 
 
 #Junk that came with ORBSLAM
-Stereo/
-RGB-D/
+#Stereo/
+#RGB-D/
 
 #Don't need bag files
 *.bag
