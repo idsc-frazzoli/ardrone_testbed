@@ -105,6 +105,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         pp.x=pos.at<float>(0);
         pp.y=pos.at<float>(1);
         pp.z=pos.at<float>(2);
+
         pc.points.push_back(pp);
     }
     

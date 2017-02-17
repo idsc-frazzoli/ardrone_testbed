@@ -37,6 +37,7 @@ build/
 Stereo/
 RGB-D/
 
+
 #Don't need bag files
 *.bag
 
