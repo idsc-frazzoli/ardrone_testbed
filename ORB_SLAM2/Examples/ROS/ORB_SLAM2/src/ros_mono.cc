@@ -106,10 +106,35 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
-    //     Main slam routine
-    mpSLAM->TrackMonocular(cv_ptr->image,cv_ptr->header.stamp.toSec());
+    //     Main slam routine. Extracts new pose
+    cv::Mat pose = mpSLAM->TrackMonocular(cv_ptr->image,cv_ptr->header.stamp.toSec());
+    tf::Vector3 origin;   
+    origin.setValue(static_cast<double>(pose.at<float>(0,3)),
+		    static_cast<double>(pose.at<float>(1,3)),
+		    static_cast<double>(pose.at<float>(2,3)));
+
+    tf::Matrix3x3 tf3d;
+    tf3d.setValue(static_cast<double>(pose.at<float>(0,0)), 
+		  static_cast<double>(pose.at<float>(0,1)), 
+		  static_cast<double>(pose.at<float>(0,2)), 
+		  static_cast<double>(pose.at<float>(1,0)), 
+		  static_cast<double>(pose.at<float>(1,1)), 
+		  static_cast<double>(pose.at<float>(1,2)), 
+		  static_cast<double>(pose.at<float>(2,0)), 
+		  static_cast<double>(pose.at<float>(2,1)), 
+		  static_cast<double>(pose.at<float>(2,2)));
+
+    tf::Quaternion tfqt;
+    tf3d.getRotation(tfqt);
+
+    transform.setOrigin(origin);
+    transform.setRotation(tfqt);
+
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "ardrone_base_frontcam"));
+
+    // gets all points
     const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
-    
+ 
     // TODO: make efficient
     pc.points.clear();
     for(size_t i=0; i<point_cloud.size();i++)
