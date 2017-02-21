@@ -116,15 +116,25 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     // if points can be tracked then broadcast the pose 
     if (not pose.empty()) {
     
-    origin.setValue(pose.at<float>(0,3), 
-                    pose.at<float>(1,3), 
-                    pose.at<float>(2,3));
+    origin.setValue(pose.at<float>-1.0*(0,3), 
+                    pose.at<float>-1.0*(0,3), 
+                    pose.at<float>-1.0*(2,3));
     
     tf3d.setValue(pose.at<float>(0,0), pose.at<float>(0,1), 
  		  pose.at<float>(0,2), pose.at<float>(1,0), 
  		  pose.at<float>(1,1), pose.at<float>(1,2), 
  		  pose.at<float>(2,0), pose.at<float>(2,1), 
  		  pose.at<float>(2,2));
+    
+    tf::Matrix3x3 correction;
+    
+//     correction.setValue(0.0<float>(0,0), 0.0<float>(0,1),
+// 		       (-1.0<float>(0,3), -1.0<float>(1,0),
+// 		       (0.0<float>(1,1), 0.0<float>(1,2),
+// 		       (0.0<float>(2,0), -1.0<float>(2,1),
+// 		       (0.0<float>(2,2));
+
+    
     
     tf3d.getRotation(tfqt);
 
