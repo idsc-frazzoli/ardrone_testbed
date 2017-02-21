@@ -114,15 +114,11 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 		    static_cast<double>(pose.at<float>(2,3)));
 
     tf::Matrix3x3 tf3d;
-    tf3d.setValue(static_cast<double>(pose.at<float>(0,0)), 
-		  static_cast<double>(pose.at<float>(0,1)), 
-		  static_cast<double>(pose.at<float>(0,2)), 
-		  static_cast<double>(pose.at<float>(1,0)), 
-		  static_cast<double>(pose.at<float>(1,1)), 
-		  static_cast<double>(pose.at<float>(1,2)), 
-		  static_cast<double>(pose.at<float>(2,0)), 
-		  static_cast<double>(pose.at<float>(2,1)), 
-		  static_cast<double>(pose.at<float>(2,2)));
+    tf3d.setValue(pose.at<float>(0,0), pose.at<float>(0,1), 
+		  pose.at<float>(0,2), pose.at<float>(1,0), 
+		  pose.at<float>(1,1), pose.at<float>(1,2), 
+		  pose.at<float>(2,0), pose.at<float>(2,1), 
+		  pose.at<float>(2,2));
 
     tf::Quaternion tfqt;
     tf3d.getRotation(tfqt);
