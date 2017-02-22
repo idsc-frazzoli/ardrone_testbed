@@ -41,7 +41,7 @@ class ImageGrabber
 {
 public:
     ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), pc(){
-        pc.header.frame_id= "/odom";
+        pc.header.frame_id= "/world";
     }
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
     
@@ -135,7 +135,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         transform.setRotation(tfqt);
         
         
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "ardrone_base_frontcam"));
+        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "odom"));
         
     }
     
