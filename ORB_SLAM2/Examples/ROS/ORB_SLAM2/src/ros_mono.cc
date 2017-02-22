@@ -25,6 +25,7 @@
 #include<chrono>
 
 #include<ros/ros.h>
+
 #include<sensor_msgs/PointCloud.h>
 #include <cv_bridge/cv_bridge.h>
 
@@ -131,8 +132,8 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
       
       tf3d.getRotation(tfqt);
 
-      transform.setOrigin(- tf3d * origin);
-      transform.setRotation(tfqt.inverse());
+      transform.setOrigin(tf3d.transpose() * origin * -1);
+      transform.setRotation(tfqt);
       
       
       br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "ardrone_base_frontcam"));
@@ -141,6 +142,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 
     // gets points from most recent frame
     const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->GetTrackedMapPoints();
+    printf("%f", static_cast<float>(point_cloud.size())); 
     
     // gets all points
     //const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
@@ -159,7 +161,6 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 
         pc.points.push_back(pp);
     }
-    
     
 }
 
