@@ -74,25 +74,22 @@ public:
         return x_world;
     }
     
-//     tf::Vector3 rotateVector(const tf::Vector3& vec, 
-//                                             const tf::Quaternion& q)
-//     {
-//         
-//         tf::quaternionMsgToTF(_q,imu_quat);
-//         tf::Quaternion z(vec.getX(),vec.getY(),vec.getZ(),0.0);// 
-//         z=imu_quat*z*(imu_quat.inverse());
-//         
-//         tf::Vector3 x_world;
-//         x_world.x=z.x();x_world.y=z.y();x_world.z=z.z();
-//         return x_world;
-//     }
+    tf::Vector3 rotateVector(const tf::Vector3& vec, const tf::Quaternion& q)
+    {
+        
+        tf::Quaternion z(vec.getX(),vec.getY(),vec.getZ(),0.0);// 
+        z=q*z*(q.inverse());
+        
+        tf::Vector3 out(z.getX(),z.getY(),z.getZ());
+        return out;
+    }
     
     void get_slam_tf()
     {
         //try to get stuff from tf node
         try{
             tf::StampedTransform slam_tf;
-            slam_listener.lookupTransform("/level", "/odom",ros::Time(0), slam_tf);
+            slam_listener.lookupTransform("level", "odom",ros::Time(0), slam_tf);
             slam_quat = slam_tf.getRotation();
             slam_pos = slam_tf.getOrigin();
         }
@@ -103,7 +100,10 @@ public:
     void update_quat_avg()
     {
         count++;
-        avg_quat=slam_quat*imu_quat.inverse();
+        tf::Quaternion zccw(1.0/sqrt(2.0),0.0,0.0,-1.0/sqrt(2.0));
+        tf::Quaternion xcw(1.0/sqrt(2.0),1.0/sqrt(2.0),0.0,0.0);
+        avg_quat = xcw*zccw;
+//         avg_quat=imu_quat*(slam_quat*right).inverse();
         tf::Vector3 origin(0.0,0.0,0.0);
         level.setOrigin(origin);
         level.setRotation(avg_quat);
