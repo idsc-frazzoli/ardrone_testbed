@@ -74,13 +74,13 @@ int main(int argc, char **argv)
     ros::Rate loop_rate(30);
     
     while (ros::ok()) {
-    
-      ros::spinOnce();
-      pub.publish(igb.pc);
-      loop_rate.sleep();
+        
+        ros::spinOnce();
+        pub.publish(igb.pc);
+        loop_rate.sleep();
     }
     
-       
+    
     // Stop all threads
     SLAM.Shutdown();
     
@@ -110,43 +110,42 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     }
     //     Main slam routine. Extracts new pose
     cv::Mat pose = mpSLAM->TrackMonocular(cv_ptr->image,cv_ptr->header.stamp.toSec());
-    mpSLAM->GetTrackedMapPoints();
     
     // if points can be tracked then broadcast the pose 
     if (not pose.empty()) {
-      
-      
-      tf::Vector3 origin;
-      tf::Quaternion tfqt;
-      tf::Matrix3x3 tf3d;
-      
-      origin.setValue(pose.at<float>(0,3), 
-		      pose.at<float>(1,3), 
-		      pose.at<float>(2,3));
-      
-      tf3d.setValue(pose.at<float>(0,0), pose.at<float>(0,1), 
-		    pose.at<float>(0,2), pose.at<float>(1,0), 
-		    pose.at<float>(1,1), pose.at<float>(1,2), 
-		    pose.at<float>(2,0), pose.at<float>(2,1), 
-		    pose.at<float>(2,2));
-      
-      tf3d.getRotation(tfqt);
-
-      transform.setOrigin(tf3d.transpose() * origin * -1);
-      transform.setRotation(tfqt);
-      
-      
-      br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "ardrone_base_frontcam"));
-
+        
+        
+        tf::Vector3 origin;
+        tf::Quaternion tfqt;
+        tf::Matrix3x3 tf3d;
+        
+        origin.setValue(pose.at<float>(0,3), 
+                        pose.at<float>(1,3), 
+                        pose.at<float>(2,3));
+        
+        tf3d.setValue(pose.at<float>(0,0), pose.at<float>(0,1), 
+                      pose.at<float>(0,2), pose.at<float>(1,0), 
+                      pose.at<float>(1,1), pose.at<float>(1,2), 
+                      pose.at<float>(2,0), pose.at<float>(2,1), 
+                      pose.at<float>(2,2));
+        
+        tf3d.getRotation(tfqt);
+        
+        transform.setOrigin(tf3d.transpose() * origin * -1);
+        transform.setRotation(tfqt);
+        
+        
+        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "ardrone_base_frontcam"));
+        
     }
-
+    
     // gets points from most recent frame
-    const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->GetTrackedMapPoints();
-    printf("%f", static_cast<float>(point_cloud.size())); 
+    //     const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->GetTrackedMapPoints();
+    //     printf("%f", static_cast<float>(point_cloud.size())); 
     
     // gets all points
-    //const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
- 
+    const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
+    
     // TODO: make efficient (use mpSLAM->GetTrackedMapPoints() to get most recent points)
     pc.points.clear();
     for(size_t i=0; i<point_cloud.size();i++)
@@ -158,7 +157,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         pp.x=pos.at<float>(0);
         pp.y=pos.at<float>(1);
         pp.z=pos.at<float>(2);
-
+        
         pc.points.push_back(pp);
     }
     
