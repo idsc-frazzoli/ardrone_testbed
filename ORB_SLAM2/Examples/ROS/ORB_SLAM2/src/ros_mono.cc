@@ -140,12 +140,8 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     }
     
     // gets points from most recent frame
-    //     const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->GetTrackedMapPoints();
-    //     printf("%f", static_cast<float>(point_cloud.size())); 
-    
     // gets all points
     const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
-    
     // TODO: make efficient (use mpSLAM->GetTrackedMapPoints() to get most recent points)
     pc.points.clear();
     for(size_t i=0; i<point_cloud.size();i++)
