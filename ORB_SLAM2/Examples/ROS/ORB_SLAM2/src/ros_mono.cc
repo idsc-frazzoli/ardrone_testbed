@@ -132,7 +132,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         tf3d.getRotation(tfqt);
         
         transform.setOrigin(tf3d.transpose() * origin * -1);
-        transform.setRotation(tfqt);
+        transform.setRotation(tfqt.inverse());
         
         
         br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "odom"));

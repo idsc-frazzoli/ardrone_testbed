@@ -4,7 +4,7 @@
 <!-- launch hector trajectory plotter -->
  		<node name="hector_trajectory_server" pkg="hector_trajectory_server" type="hector_trajectory_server" output="screen" />
 <!-- launch rviz -->
- 		<node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d ~/ardrone_ws/src/ardrone_glc/rviz/master_config.rviz" />
+ 		<node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find ardrone_orb)/../rviz/master_config.rviz" />
 </launch>
 </include>
 
