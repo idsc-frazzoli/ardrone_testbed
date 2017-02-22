@@ -5,6 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   roslib
   std_msgs
+  tf
 )
 catkin_package(
 #  INCLUDE_DIRS include
