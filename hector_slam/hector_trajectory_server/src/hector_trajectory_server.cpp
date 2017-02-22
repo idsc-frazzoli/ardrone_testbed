@@ -61,7 +61,7 @@ public:
     ros::NodeHandle private_nh("~");
 
     private_nh.param("target_frame_name", p_target_frame_name_, std::string("world"));
-    private_nh.param("source_frame_name", p_source_frame_name_, std::string("ardrone_base_frontcam"));
+    private_nh.param("source_frame_name", p_source_frame_name_, std::string("odom"));
     private_nh.param("trajectory_update_rate", p_trajectory_update_rate_, 4.0);
     private_nh.param("trajectory_publish_rate", p_trajectory_publish_rate_, 0.25);
 

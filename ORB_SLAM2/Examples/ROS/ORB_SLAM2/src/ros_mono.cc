@@ -41,7 +41,7 @@ class ImageGrabber
 {
 public:
     ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), pc(){
-        pc.header.frame_id= "/world";
+        pc.header.frame_id= "world";
     }
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
     
