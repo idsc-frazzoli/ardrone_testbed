@@ -41,7 +41,7 @@ class ImageGrabber
 {
 public:
     ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), pc(){
-        pc.header.frame_id= "world";
+        pc.header.frame_id= "/level";
     }
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
     
@@ -134,7 +134,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         transform.setOrigin(tf3d.transpose() * origin * -1);
         transform.setRotation(tfqt.inverse());
         
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "level", "odom"));
+        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/odom"));
         
     }
     

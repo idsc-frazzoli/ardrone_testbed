@@ -24,6 +24,7 @@ public:
     
     tf::TransformListener slam_listener;
     tf::Vector3 slam_pos;
+    tf::Vector3 odom_pos;
     tf::Quaternion slam_quat;
     tf::Quaternion imu_quat;
     tf::Quaternion avg_quat;
@@ -58,6 +59,7 @@ public:
         }
     
         dt=t_now-t_last;
+        tf::quaternionMsgToTF(imu_data.orientation,imu_quat);
         acceleration = bodyToWorldFrame(imu_data.linear_acceleration,imu_data.orientation);
     }
     
@@ -89,7 +91,7 @@ public:
         //try to get stuff from tf node
         try{
             tf::StampedTransform slam_tf;
-            slam_listener.lookupTransform("level", "odom",ros::Time(0), slam_tf);
+            slam_listener.lookupTransform("/level", "/odom",ros::Time(0), slam_tf);
             slam_quat = slam_tf.getRotation();
             slam_pos = slam_tf.getOrigin();
         }
@@ -100,14 +102,18 @@ public:
     void update_quat_avg()
     {
         count++;
-        tf::Quaternion zccw(1.0/sqrt(2.0),0.0,0.0,-1.0/sqrt(2.0));
-        tf::Quaternion xcw(1.0/sqrt(2.0),1.0/sqrt(2.0),0.0,0.0);
-        avg_quat = xcw*zccw;
-//         avg_quat=imu_quat*(slam_quat*right).inverse();
-        tf::Vector3 origin(0.0,0.0,0.0);
+        
+        tf::Quaternion r1 = tf::createQuaternionFromRPY(-M_PI/2.0,M_PI/2.0,0.0);
+        tf::Quaternion r2 = tf::createQuaternionFromRPY(0,-M_PI/2,0);
+        tf::Quaternion r3 = tf::createQuaternionFromRPY(0,0,-M_PI/2);
+        
+        avg_quat = r3*r2*r1;
+        
+        tf::Vector3 origin(1.0,0.0,0.0);
         level.setOrigin(origin);
         level.setRotation(avg_quat);
-        br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "world", "level"));
+        odom_pos = tf::quatRotate(avg_quat,slam_pos);
+        br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "/world", "/level"));
         
     }
     
@@ -129,9 +135,9 @@ int main(int argc, char **argv)
 //         printf("a_x: %f, a_y: %f, a_z: %f\n",odometer.acceleration.x,
 //                                              odometer.acceleration.y,
 //                                              odometer.acceleration.z);
-        printf("x: %f, y: %f, z: %f\n",odometer.slam_pos.getX(),
-                                       odometer.slam_pos.getY(),
-                                       odometer.slam_pos.getZ());
+        printf("x: %f, y: %f, z: %f\n",10*odometer.odom_pos.getX(),
+                                       10*odometer.odom_pos.getY(),
+                                       10*odometer.odom_pos.getZ());
         printf("slam_w: %f, slam_x: %f ,slam_y: %f, slam_z: %f \n",odometer.slam_quat.getW(),
                                             odometer.slam_quat.getX(),
                                             odometer.slam_quat.getY(),
