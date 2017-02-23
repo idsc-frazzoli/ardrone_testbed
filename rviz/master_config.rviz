@@ -7,7 +7,7 @@ Panels:
         - /Global Options1
         - /Status1
         - /TF1
-        - /TF1/Status1
+        - /TF1/Frames1
       Splitter Ratio: 0.5
     Tree Height: 564
   - Class: rviz/Selection
@@ -54,12 +54,14 @@ Visualization Manager:
       Enabled: true
       Frame Timeout: 15
       Frames:
-        All Enabled: true
+        All Enabled: false
         ardrone_base_bottomcam:
-          Value: true
+          Value: false
         ardrone_base_frontcam:
-          Value: true
+          Value: false
         ardrone_base_link:
+          Value: false
+        level:
           Value: true
         odom:
           Value: true
@@ -72,12 +74,13 @@ Visualization Manager:
       Show Names: true
       Tree:
         world:
-          odom:
-            ardrone_base_link:
-              ardrone_base_bottomcam:
-                {}
-              ardrone_base_frontcam:
-                {}
+          level:
+            odom:
+              ardrone_base_link:
+                ardrone_base_bottomcam:
+                  {}
+                ardrone_base_frontcam:
+                  {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -100,12 +103,12 @@ Visualization Manager:
       Reference Frame: odom
       Value: true
     - Class: rviz/Axes
-      Enabled: true
+      Enabled: false
       Length: 1
       Name: WORLD COSY
       Radius: 0.100000001
       Reference Frame: world
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
@@ -182,24 +185,24 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 6.7068119
+      Distance: 6.42123032
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.236082271
-        Y: 1.33076227
-        Z: -2.36066341
+        X: -0.037188787
+        Y: -0.644793212
+        Z: -1.26750052
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.300203562
+      Pitch: 0.635203302
       Target Frame: ardrone_base_frontcam
       Value: Orbit (rviz)
-      Yaw: 1.85904777
+      Yaw: 2.82404828
     Saved: ~
 Window Geometry:
   Displays:
@@ -219,5 +222,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1855
-  X: 1985
-  Y: 144
+  X: 2625
+  Y: 116
