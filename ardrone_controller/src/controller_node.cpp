@@ -27,7 +27,7 @@ public:
     tf::Vector3 odom_pos;
     tf::Quaternion slam_quat;
     tf::Quaternion imu_quat;
-    tf::Quaternion avg_quat;
+    tf::Quaternion quat_cam_drone;
     tf::TransformBroadcaster br;
     tf::Transform level;
     
@@ -99,20 +99,18 @@ public:
             ROS_ERROR("%s",ex.what());
         }
     }
-    void update_quat_avg()
+    void broadcast_rel_tf()
     {
-        count++;
-        
         tf::Quaternion r1 = tf::createQuaternionFromRPY(-M_PI/2.0,M_PI/2.0,0.0);
         tf::Quaternion r2 = tf::createQuaternionFromRPY(0,-M_PI/2,0);
         tf::Quaternion r3 = tf::createQuaternionFromRPY(0,0,-M_PI/2);
         
-        avg_quat = r3*r2*r1;
+        quat_cam_drone = r3*r2*r1;
         
-        tf::Vector3 origin(1.0,0.0,0.0);
+        tf::Vector3 origin(0.0,0.0,0.0);
         level.setOrigin(origin);
-        level.setRotation(avg_quat);
-        odom_pos = tf::quatRotate(avg_quat,slam_pos);
+        level.setRotation(quat_cam_drone);
+        odom_pos = tf::quatRotate(quat_cam_drone,slam_pos);
         br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "/world", "/level"));
         
     }
@@ -130,31 +128,9 @@ int main(int argc, char **argv)
     
     ros::Rate loop_rate(10);//the received msg is published at 200Hz.
     while (ros::ok())
-    {
-
-//         printf("a_x: %f, a_y: %f, a_z: %f\n",odometer.acceleration.x,
-//                                              odometer.acceleration.y,
-//                                              odometer.acceleration.z);
-//         printf("x: %f, y: %f, z: %f\n",10*odometer.odom_pos.getX(),
-//                                        10*odometer.odom_pos.getY(),
-//                                        10*odometer.odom_pos.getZ());
-//         printf("slam_w: %f, slam_x: %f ,slam_y: %f, slam_z: %f \n",odometer.slam_quat.getW(),
-//                                             odometer.slam_quat.getX(),
-//                                             odometer.slam_quat.getY(),
-//                                             odometer.slam_quat.getZ());
-//         
-//         printf(" imu_w: %f,  imu_x: %f,  imu_y: %f,  imu_z: %f \n",odometer.imu_quat.getW(),
-//                odometer.imu_quat.getX(),
-//                odometer.imu_quat.getY(),
-//                odometer.imu_quat.getZ());
-//         
-//         printf("diff_x: %f, diff_x: %f, diff_y: %f, diff_z: %f \n",odometer.avg_quat.getW(),
-//                odometer.avg_quat.getX(),
-//                odometer.avg_quat.getY(),
-//                odometer.avg_quat.getZ());
-        
+    {      
         odometer.get_slam_tf();
-        odometer.update_quat_avg();
+        odometer.broadcast_rel_tf();
         ros::spinOnce();
         
         loop_rate.sleep();
