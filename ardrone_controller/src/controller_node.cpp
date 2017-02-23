@@ -135,23 +135,23 @@ int main(int argc, char **argv)
 //         printf("a_x: %f, a_y: %f, a_z: %f\n",odometer.acceleration.x,
 //                                              odometer.acceleration.y,
 //                                              odometer.acceleration.z);
-        printf("x: %f, y: %f, z: %f\n",10*odometer.odom_pos.getX(),
-                                       10*odometer.odom_pos.getY(),
-                                       10*odometer.odom_pos.getZ());
-        printf("slam_w: %f, slam_x: %f ,slam_y: %f, slam_z: %f \n",odometer.slam_quat.getW(),
-                                            odometer.slam_quat.getX(),
-                                            odometer.slam_quat.getY(),
-                                            odometer.slam_quat.getZ());
-        
-        printf(" imu_w: %f,  imu_x: %f,  imu_y: %f,  imu_z: %f \n",odometer.imu_quat.getW(),
-               odometer.imu_quat.getX(),
-               odometer.imu_quat.getY(),
-               odometer.imu_quat.getZ());
-        
-        printf("diff_x: %f, diff_x: %f, diff_y: %f, diff_z: %f \n",odometer.avg_quat.getW(),
-               odometer.avg_quat.getX(),
-               odometer.avg_quat.getY(),
-               odometer.avg_quat.getZ());
+//         printf("x: %f, y: %f, z: %f\n",10*odometer.odom_pos.getX(),
+//                                        10*odometer.odom_pos.getY(),
+//                                        10*odometer.odom_pos.getZ());
+//         printf("slam_w: %f, slam_x: %f ,slam_y: %f, slam_z: %f \n",odometer.slam_quat.getW(),
+//                                             odometer.slam_quat.getX(),
+//                                             odometer.slam_quat.getY(),
+//                                             odometer.slam_quat.getZ());
+//         
+//         printf(" imu_w: %f,  imu_x: %f,  imu_y: %f,  imu_z: %f \n",odometer.imu_quat.getW(),
+//                odometer.imu_quat.getX(),
+//                odometer.imu_quat.getY(),
+//                odometer.imu_quat.getZ());
+//         
+//         printf("diff_x: %f, diff_x: %f, diff_y: %f, diff_z: %f \n",odometer.avg_quat.getW(),
+//                odometer.avg_quat.getX(),
+//                odometer.avg_quat.getY(),
+//                odometer.avg_quat.getZ());
         
         odometer.get_slam_tf();
         odometer.update_quat_avg();
