@@ -28,6 +28,7 @@
 
 #include<sensor_msgs/PointCloud.h>
 #include <cv_bridge/cv_bridge.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 #include<opencv2/core/core.hpp>
 
@@ -48,6 +49,7 @@ public:
     ORB_SLAM2::System* mpSLAM;
     
     sensor_msgs::PointCloud pc;
+    geometry_msgs::PoseWithCovarianceStamped pose_out_;
 };
 
 int main(int argc, char **argv)
@@ -70,6 +72,7 @@ int main(int argc, char **argv)
     ros::NodeHandle nodeHandler;
     ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
     ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/environment/point_cloud", 2);
+    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("orb_pose_measurement",2);
     
     ros::Rate loop_rate(30);
     
@@ -77,6 +80,7 @@ int main(int argc, char **argv)
         
         ros::spinOnce();
         pub.publish(igb.pc);
+	pose_pub.publish(igb.pose_out_);
         loop_rate.sleep();
     }
     
@@ -96,6 +100,7 @@ int main(int argc, char **argv)
 void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 {
     static tf::TransformBroadcaster br;
+    geometry_msgs::PoseWithCovarianceStamped pose_out;
     tf::Transform transform;
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptr;
@@ -114,28 +119,55 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     // if points can be tracked then broadcast the pose 
     if (not pose.empty()) {
         
-        
-        tf::Vector3 origin;
-        tf::Quaternion tfqt;
-        tf::Matrix3x3 tf3d;
+        geometry_msgs::Quaternion attitude;
+      
+      
+         tf::Vector3 origin;
+         tf::Quaternion tfqt;
+         tf::Matrix3x3 tf3d;
         
         origin.setValue(pose.at<float>(0,3), 
                         pose.at<float>(1,3), 
                         pose.at<float>(2,3));
-        
-        tf3d.setValue(pose.at<float>(0,0), pose.at<float>(0,1), 
+       
+	tf3d.setValue(pose.at<float>(0,0), pose.at<float>(0,1), 
                       pose.at<float>(0,2), pose.at<float>(1,0), 
                       pose.at<float>(1,1), pose.at<float>(1,2), 
                       pose.at<float>(2,0), pose.at<float>(2,1), 
                       pose.at<float>(2,2));
-        
-        tf3d.getRotation(tfqt);
+        tf3d.getRotation(tfqt); 
         
         transform.setOrigin(tf3d.transpose() * origin * -1);
         transform.setRotation(tfqt.inverse());
-        
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/odom"));
-        
+	
+	br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/odom"));
+
+	
+        //TODO: Make transformation from euler to quaternion without the usage of tf!       
+	
+	pose_out.pose.pose.orientation.x = tfqt.getX();
+	pose_out.pose.pose.orientation.y = tfqt.getY();
+	pose_out.pose.pose.orientation.z = tfqt.getZ();
+	pose_out.pose.pose.orientation.w = tfqt.getW();
+	pose_out.pose.pose.position.x = pose.at<float>(0,3);
+	pose_out.pose.pose.position.y = pose.at<float>(1,3);
+	pose_out.pose.pose.position.z = pose.at<float>(2,3);
+	
+	//TODO: Set covariance
+	for(auto& x:pose_out.pose.covariance)
+	  x = 0.0;
+	
+	pose_out.header.stamp = ros::Time::now();
+	
+	pose_out_ = pose_out;
+	
+// 	pose_out.pose.covariance. = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+// 				//    pose_out.pose.cova
     }
     
     // gets points from most recent frame
