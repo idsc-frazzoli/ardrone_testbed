@@ -182,7 +182,11 @@ void SSF_Core::initialize(const Eigen::Matrix<double, 3, 1> & p, const Eigen::Ma
 }
 
 
+<<<<<<< HEAD
 void SSF_Core::imuCallback(const sensor_msgs::ImuConstPtr &msg)
+=======
+void SSF_Core::imuCallback(const sensor_msgs::ImuConstPtr & msg)
+>>>>>>> de4e6b30fcd11a18f547b2ab3aedcc1d01a45f81
 {
 
   if (!initialized_)

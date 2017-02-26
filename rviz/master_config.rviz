@@ -63,6 +63,8 @@ Visualization Manager:
           Value: false
         level:
           Value: true
+        level:
+          Value: true
         odom:
           Value: true
         world:
@@ -76,11 +78,7 @@ Visualization Manager:
         world:
           level:
             odom:
-              ardrone_base_link:
-                ardrone_base_bottomcam:
-                  {}
-                ardrone_base_frontcam:
-                  {}
+              {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image

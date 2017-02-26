@@ -31,13 +31,12 @@ set_property(TARGET pose_sensor PROPERTY COMPILE_DEFINITIONS POSE_MEAS)
 
 target_link_libraries(pose_sensor ${catkin_LIBRARIES})
 
-add_executable(viconpos_sensor src/main.cpp src/viconpos_sensor.cpp)
-set_property(TARGET viconpos_sensor PROPERTY COMPILE_DEFINITIONS VICONPOS_MEAS)
-
-target_link_libraries(viconpos_sensor ${catkin_LIBRARIES})
-
 add_executable(position_sensor src/main.cpp src/position_sensor.cpp)
 set_property(TARGET position_sensor PROPERTY COMPILE_DEFINITIONS POSITION_MEAS)
 
 target_link_libraries(position_sensor ${catkin_LIBRARIES})
 
+add_executable(orb_sensor src/main.cpp src/orb_sensor.cpp)
+set_property(TARGET orb_sensor PROPERTY COMPILE_DEFINITIONS ORB_MEAS)
+
+target_link_libraries(orb_sensor ${catkin_LIBRARIES})
