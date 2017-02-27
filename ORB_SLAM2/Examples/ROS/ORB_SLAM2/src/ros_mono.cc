@@ -53,8 +53,6 @@ public:
     
     sensor_msgs::PointCloud pc;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
-    tf::Quaternion tfqt_i;
-    tf::Matrix3x3 tf3d;
 };
 
 int main(int argc, char **argv)
@@ -81,77 +79,7 @@ int main(int argc, char **argv)
     
     ros::Rate loop_rate(30);
     
-    while (ros::ok()) {
-//       geometry_msgs::Quaternion q = igb.pose_out_.pose.pose.orientation;
-// 	double ysqr = q.y * q.y;
-// 
-// 	// roll (x-axis rotation)
-// 	double t0 = +2.0 * (q.w * q.x + q.y * q.z);
-// 	double t1 = +1.0 - 2.0 * (q.x * q.x + ysqr);
-// 	double roll1 = std::atan2(t0, t1);
-// 
-// 	// pitch (y-axis rotation)
-// 	double t2 = +2.0 * (q.w * q.y - q.z * q.x);
-// 	t2 = t2 > 1.0 ? 1.0 : t2;
-// 	t2 = t2 < -1.0 ? -1.0 : t2;
-// 	double pitch1 = std::asin(t2);
-// 
-// 	// yaw (z-axis rotation)
-// 	double t3 = +2.0 * (q.w * q.z + q.x * q.y);
-// 	double t4 = +1.0 - 2.0 * (ysqr + q.z * q.z);  
-// 	double yaw1 = std::atan2(t3, t4);
-// 	
-// 	
-// 	
-// 	ysqr = igb.tfqt_i.getY() * igb.tfqt_i.getY();
-// 
-// 	// roll (x-axis rotation)
-// 	t0 = +2.0 * (igb.tfqt_i.getW() * igb.tfqt_i.getX() + igb.tfqt_i.getY() * igb.tfqt_i.getZ());
-// 	t1 = +1.0 - 2.0 * (igb.tfqt_i.getX() * igb.tfqt_i.getX() + ysqr);
-// 	double roll = std::atan2(t0, t1);
-// 
-// 	// pitch (y-axis rotation)
-// 	t2 = +2.0 * (igb.tfqt_i.getW() * igb.tfqt_i.getY() - igb.tfqt_i.getZ() * igb.tfqt_i.getX());
-// 	t2 = t2 > 1.0 ? 1.0 : t2;
-// 	t2 = t2 < -1.0 ? -1.0 : t2;
-// 	double pitch = std::asin(t2);
-// 
-// 	// yaw (z-axis rotation)
-// 	t3 = +2.0 * (igb.tfqt_i.getW() * igb.tfqt_i.getZ() + igb.tfqt_i.getX() * igb.tfqt_i.getY());
-// 	t4 = +1.0 - 2.0 * (ysqr + igb.tfqt_i.getZ() * igb.tfqt_i.getZ());  
-// 	double yaw = std::atan2(t3, t4);
-       tf::Matrix3x3 tf3d_extra(0, 0, 1,1,0,0,0,1,0);
-       tf::Matrix3x3 new_matrix;
-       
-       float roll, pitch, yaw, roll1, pitch1, yaw1; 
-      
-       igb.tf3d = igb.tf3d.inverse();
-       
-       igb.tf3d.getRPY(roll, pitch, yaw);
-       tf::Matrix3x3 new_matrix = tf3d_extra * igb.tf3d;
-       new_matrix.getRPY(roll1, pitch1, yaw1);
-      
-      
-      
-      	printf("roll: %f, pitch: %f, yaw: %f\nroll1: %f, pitch1: %f, yaw1: %f\n", roll, pitch, yaw, roll1, pitch1, yaw1);
-	/*
-		10*odometer.odom_pos.getZ())
-			printf("slam_w: %f, slam_x: %f ,slam_y: %f, slam_z: %f\n",odometer.slam_quat.getW(),
-		odometer.slam_quat.getX(),
-		odometer.slam_quat.getY(),a
-		
-		odometer.slam_quat.getZ());
-
-	printf(" imu_w: %f,  imu_x: %f,  imu_y: %f,  imu_z: %f\n",odometer.imu_quat.getW(),
-	      odometer.imu_quat.getX(),
-	      odometer.imu_quat.getY(),
-	      odometer.imu_quat.getZ());
-
-	printf("diff_x: %f, diff_x: %f, diff_y: %f, diff_z: %f\n",odometer.avg_quat.getW(),
-	      odometer.avg_quat.getX(),
-	      odometer.avg_quat.getY(),
-	      odometer.avg_quat.getZ());*/
-        
+    while (ros::ok()) {    
         ros::spinOnce();
         pub.publish(igb.pc);
 	pose_pub.publish(igb.pose_out_);
@@ -212,8 +140,8 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         transform.setRotation(tfqt.inverse());
 	
 	// invert pose for orb pose publishing
-	tfqt_i = tfqt.inverse();
-	tf::Matrix3x3 tf3d_extra_i = tf3d_extra.inverse();
+	
+	//tf::Matrix3x3 tf3d_extra_i = tf3d_extra.inverse();
 	tf::Vector3 origin_i = tf3d.transpose() * origin * -1;
 	
 	br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/odom"));
@@ -222,18 +150,16 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         tf::Quaternion r1 = tf::createQuaternionFromRPY(-M_PI/2.0,M_PI/2.0,0.0);
         tf::Quaternion r2 = tf::createQuaternionFromRPY(0,-M_PI/2,0);
         tf::Quaternion r3 = tf::createQuaternionFromRPY(0,0,-M_PI/2);
-        tf::Quaternion r4 = tf::createQuaternionFromRPY(0,0,M_PI/2);
 	
         tf::Quaternion quat_cam_drone = r3*r2*r1;
 	
-	tf::Quaternion tfqt_i_rot = r4*quat_cam_drone*tfqt_i;
 	origin_i = tf::quatRotate(quat_cam_drone,origin_i);
 	
 	
-	pose_out_.pose.pose.orientation.x = tfqt_i_rot.getX();
-	pose_out_.pose.pose.orientation.y = tfqt_i_rot.getY();
-	pose_out_.pose.pose.orientation.z = tfqt_i_rot.getZ();
-	pose_out_.pose.pose.orientation.w = tfqt_i_rot.getW();
+	pose_out_.pose.pose.orientation.x = tfqt.getX();
+	pose_out_.pose.pose.orientation.y = tfqt.getY();
+	pose_out_.pose.pose.orientation.z = tfqt.getZ();
+	pose_out_.pose.pose.orientation.w = tfqt.getW();
 	pose_out_.pose.pose.position.x = origin_i.getX();
 	pose_out_.pose.pose.position.y = origin_i.getY();
 	pose_out_.pose.pose.position.z = origin_i.getZ();
@@ -241,7 +167,6 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	//TODO: Set covariance
 	for(auto& x:pose_out_.pose.covariance)
 	  x = 0.0;
-	
 	
 	pose_out_.header.frame_id = "world";
 	

@@ -9,7 +9,6 @@ Panels:
         - /TF1
         - /TF1/Frames1
         - /PoseWithCovariance1
-        - /PoseWithCovariance1/Status1
       Splitter Ratio: 0.5
     Tree Height: 564
   - Class: rviz/Selection
@@ -64,11 +63,11 @@ Visualization Manager:
         ardrone_base_link:
           Value: false
         level:
-          Value: true
+          Value: false
         odom:
           Value: true
         world:
-          Value: true
+          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -78,7 +77,11 @@ Visualization Manager:
         world:
           level:
             odom:
-              {}
+              ardrone_base_link:
+                ardrone_base_bottomcam:
+                  {}
+                ardrone_base_frontcam:
+                  {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -213,24 +216,24 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 11.2857895
+      Distance: 4.05875921
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.037188787
-        Y: -0.644793212
-        Z: -1.26750052
+        X: 0.466477603
+        Y: -0.519004345
+        Z: -0.459445685
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.52020371
+      Pitch: 0.495203793
       Target Frame: ardrone_base_frontcam
       Value: Orbit (rviz)
-      Yaw: 3.00405693
+      Yaw: 2.81405854
     Saved: ~
 Window Geometry:
   Displays:
