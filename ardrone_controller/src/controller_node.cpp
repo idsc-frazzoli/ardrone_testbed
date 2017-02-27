@@ -128,7 +128,7 @@ int main(int argc, char **argv)
     
     ros::Rate loop_rate(10);//the received msg is published at 200Hz.
     while (ros::ok())
-    {      
+    {    
         odometer.get_slam_tf();
         odometer.broadcast_rel_tf();
         ros::spinOnce();

@@ -53,6 +53,8 @@ public:
     
     sensor_msgs::PointCloud pc;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
+    tf::Quaternion quat_cam_drone;
+    tf::Quaternion tfqt_adj;
 };
 
 int main(int argc, char **argv)
@@ -121,54 +123,50 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     if (not pose.empty()) {
         
         tf::Vector3 origin;
-        tf::Quaternion tfqt;
-        tf::Matrix3x3 tf3d;
-
+        tf::Quaternion transform_quat;
+        tf::Matrix3x3 transform_matrix;
 	
-        origin.setValue(pose.at<float>(0,3), 
-                        pose.at<float>(1,3), 
-                        pose.at<float>(2,3));
+        origin.setValue(pose.at<float>(0,3), pose.at<float>(1,3), pose.at<float>(2,3));
        
-	tf3d.setValue(pose.at<float>(0,0), pose.at<float>(0,1), 
-                      pose.at<float>(0,2), pose.at<float>(1,0), 
-                      pose.at<float>(1,1), pose.at<float>(1,2), 
-                      pose.at<float>(2,0), pose.at<float>(2,1), 
-                      pose.at<float>(2,2));
-        tf3d.getRotation(tfqt); 
+	transform_matrix.setValue(pose.at<float>(0,0), pose.at<float>(0,1), pose.at<float>(0,2), 
+		                  pose.at<float>(1,0), pose.at<float>(1,1), pose.at<float>(1,2), 
+                                  pose.at<float>(2,0), pose.at<float>(2,1), pose.at<float>(2,2));
+	
+        transform_matrix.getRotation(transform_quat); 
         
-        transform.setOrigin(tf3d.transpose() * origin * -1);
-        transform.setRotation(tfqt.inverse());
+        transform.setOrigin(transform_matrix.transpose() * origin * -1);
+        transform.setRotation(transform_quat.inverse());
 	
-	// invert pose for orb pose publishing
-	
-	//tf::Matrix3x3 tf3d_extra_i = tf3d_extra.inverse();
-	tf::Vector3 origin_i = tf3d.transpose() * origin * -1;
+	// synchronize pose_out and transform_out and broadcast transform
+	ros::Time t = ros::Time::now();
+	pose_out_.header.stamp = t;
+	tf::StampedTransform transform_out = tf::StampedTransform(transform, t, "/level", "/odom");
 	
 	br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/odom"));
-	pose_out_.header.stamp = ros::Time::now();
 	
-        tf::Quaternion r1 = tf::createQuaternionFromRPY(-M_PI/2.0,M_PI/2.0,0.0);
-        tf::Quaternion r2 = tf::createQuaternionFromRPY(0,-M_PI/2,0);
-        tf::Quaternion r3 = tf::createQuaternionFromRPY(0,0,-M_PI/2);
+	// rotate camera pose into world frame
+	pose_out_.header.frame_id = "world";
 	
-        tf::Quaternion quat_cam_drone = r3*r2*r1;
+	// define helper quaternions
+	tf::Quaternion origin_transform = tf::Quaternion(-0.5, 0.5, -0.5, 0.5);
+	tf::Quaternion other_transform = tf::Quaternion(0.5, -0.5, 0.5, 0.5);
+	tf::Quaternion rotation_transform = tf::Quaternion(0, -sqrt(2)/2, 0, sqrt(2)/2);
 	
-	origin_i = tf::quatRotate(quat_cam_drone,origin_i);
+	rotation_transform = other_transform.inverse() * transform_quat.inverse() * rotation_transform;
 	
+	tf::Vector3 origin_i_rotated = tf::quatRotate(origin_transform, transform_matrix.transpose() * origin * -1);
 	
-	pose_out_.pose.pose.orientation.x = tfqt.getX();
-	pose_out_.pose.pose.orientation.y = tfqt.getY();
-	pose_out_.pose.pose.orientation.z = tfqt.getZ();
-	pose_out_.pose.pose.orientation.w = tfqt.getW();
-	pose_out_.pose.pose.position.x = origin_i.getX();
-	pose_out_.pose.pose.position.y = origin_i.getY();
-	pose_out_.pose.pose.position.z = origin_i.getZ();
+	pose_out_.pose.pose.orientation.x = rotation_transform.getX();
+	pose_out_.pose.pose.orientation.y = rotation_transform.getY();
+	pose_out_.pose.pose.orientation.z = rotation_transform.getZ();
+	pose_out_.pose.pose.orientation.w = rotation_transform.getW();
+	pose_out_.pose.pose.position.x = origin_i_rotated.getX();
+	pose_out_.pose.pose.position.y = origin_i_rotated.getY();
+	pose_out_.pose.pose.position.z = origin_i_rotated.getZ();
 	
 	//TODO: Set covariance
 	for(auto& x:pose_out_.pose.covariance)
 	  x = 0.0;
-	
-	pose_out_.header.frame_id = "world";
 	
 // 	pose_out.pose.covariance. = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 // 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
