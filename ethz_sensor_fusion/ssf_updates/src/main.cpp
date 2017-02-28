@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "position_measurements.h"
 #endif
 #ifdef ORB_MEAS
-#include "orb_measurements.h"
+#include "orb_pose_measurements.h"
 #endif
 
 int main(int argc, char** argv)

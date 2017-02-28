@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#include "orb_sensor.h"
+#include "orb_pose_sensor.h"
 #include <ssf_core/eigen_utils.h>
 
 #define N_MEAS 7 // measurement size
@@ -52,7 +52,7 @@ PoseSensorHandler::PoseSensorHandler(ssf_core::Measurements* meas) :
 void PoseSensorHandler::subscribe()
 {
   ros::NodeHandle nh("ssf_core");
-  subMeasurement_ = nh.subscribe("orb_pose_measurement", 1, &PoseSensorHandler::measurementCallback, this);
+  subMeasurement_ = nh.subscribe("pose_measurement", 1, &PoseSensorHandler::measurementCallback, this);
 				//subscribe to camera here
   measurements->ssf_core_.registerCallback(&PoseSensorHandler::noiseConfig, this);
 

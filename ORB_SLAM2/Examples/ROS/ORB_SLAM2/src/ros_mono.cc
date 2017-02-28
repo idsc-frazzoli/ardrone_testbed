@@ -77,7 +77,7 @@ int main(int argc, char **argv)
     ros::NodeHandle nodeHandler;
     ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
     ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/environment/point_cloud", 2);
-    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("orb_pose_measurement",2);
+    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("/orb_pose_measurement",2);
     
     ros::Rate loop_rate(30);
     
@@ -140,12 +140,12 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	// synchronize pose_out and transform_out and broadcast transform
 	ros::Time t = ros::Time::now();
 	pose_out_.header.stamp = t;
-	tf::StampedTransform transform_out = tf::StampedTransform(transform, t, "/level", "/odom");
+	tf::StampedTransform transform_out = tf::StampedTransform(transform, t, "/level", "/camera");
 	
-	br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/odom"));
+	br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/camera"));
 	
 	// rotate camera pose into world frame
-	pose_out_.header.frame_id = "world";
+	pose_out_.header.frame_id = "ardrone_base_link";
 	
 	// define helper quaternions
 	tf::Quaternion origin_transform = tf::Quaternion(-0.5, 0.5, -0.5, 0.5);

@@ -29,12 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef ORB_MEASUREMENTS_H
-#define ORB_MEASUREMENTS_H
+#ifndef ORB_POSE_MEASUREMENTS_H
+#define ORB_POSE_MEASUREMENTS_H
 
 #include <ros/ros.h>
 #include <ssf_core/measurement.h>
-#include "orb_sensor.h"
+#include "orb_pose_sensor.h"
 
 class OrbPoseMeasurements : public ssf_core::Measurements
 {
@@ -107,4 +107,4 @@ private:
   }
 };
 
-#endif /* POSE_MEASUREMENTS_H */
+#endif /* ORB_POSE_MEASUREMENTS_H */

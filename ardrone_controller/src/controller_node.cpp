@@ -91,7 +91,7 @@ public:
         //try to get stuff from tf node
         try{
             tf::StampedTransform slam_tf;
-            slam_listener.lookupTransform("/level", "/odom",ros::Time(0), slam_tf);
+            slam_listener.lookupTransform("/level", "/camera",ros::Time(0), slam_tf);
             slam_quat = slam_tf.getRotation();
             slam_pos = slam_tf.getOrigin();
         }
@@ -111,7 +111,7 @@ public:
         level.setOrigin(origin);
         level.setRotation(quat_cam_drone);
         odom_pos = tf::quatRotate(quat_cam_drone,slam_pos);
-        br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "/world", "/level"));
+        br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "/ardrone_base_link", "/level"));
         
     }
     

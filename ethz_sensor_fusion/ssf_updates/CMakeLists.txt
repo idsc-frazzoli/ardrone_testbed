@@ -36,7 +36,7 @@ set_property(TARGET position_sensor PROPERTY COMPILE_DEFINITIONS POSITION_MEAS)
 
 target_link_libraries(position_sensor ${catkin_LIBRARIES})
 
-add_executable(orb_sensor src/main.cpp src/orb_sensor.cpp)
-set_property(TARGET orb_sensor PROPERTY COMPILE_DEFINITIONS ORB_MEAS)
+add_executable(orb_pose_sensor src/main.cpp src/orb_pose_sensor.cpp)
+set_property(TARGET orb_pose_sensor PROPERTY COMPILE_DEFINITIONS ORB_MEAS)
 
-target_link_libraries(orb_sensor ${catkin_LIBRARIES})
+target_link_libraries(orb_pose_sensor ${catkin_LIBRARIES})
