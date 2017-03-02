@@ -216,6 +216,8 @@ void SSF_Core::imuCallback(const sensor_msgs::ImuConstPtr & msg)
   propagateState(StateBuffer_[idx_state_].time_ - StateBuffer_[(unsigned char)(idx_state_ - 1)].time_);
   predictProcessCovariance(StateBuffer_[idx_P_].time_ - StateBuffer_[(unsigned char)(idx_P_ - 1)].time_);
 
+  
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   checkForNumeric((double*)(&StateBuffer_[idx_state_ - 1].p_[0]), 3, "prediction p");
 
   predictionMade_ = true;
@@ -274,6 +276,7 @@ void SSF_Core::stateCallback(const sensor_fusion_comm::ExtEkfConstPtr & msg)
   if (flag == sensor_fusion_comm::ExtEkf::current_state)
     isnumeric = checkForNumeric(&msg->state[0], 10, "before prediction p,v,q");
 
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   isnumeric = checkForNumeric((double*)(&StateBuffer_[idx_state_].p_[0]), 3, "before prediction p");
 
   if (flag == sensor_fusion_comm::ExtEkf::current_state && isnumeric) // state propagation is made externally, so we read the actual state
@@ -299,6 +302,8 @@ void SSF_Core::stateCallback(const sensor_fusion_comm::ExtEkfConstPtr & msg)
 
   predictProcessCovariance(StateBuffer_[idx_P_].time_ - StateBuffer_[(unsigned char)(idx_P_ - 1)].time_);
 
+  
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   isnumeric = checkForNumeric((double*)(&StateBuffer_[idx_state_ - 1].p_[0]), 3, "prediction p");
   isnumeric = checkForNumeric((double*)(&StateBuffer_[idx_state_ - 1].P_(0)), N_STATE * N_STATE, "prediction done P");
 
@@ -615,6 +620,7 @@ bool SSF_Core::applyCorrection(unsigned char idx_delaystate, const ErrorState & 
   while (idx_state_ != idx_time_)
     propagateState(StateBuffer_[idx_state_].time_ - StateBuffer_[(unsigned char)(idx_state_ - 1)].time_);
 
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   checkForNumeric(&correction_[0], HLI_EKF_STATE_SIZE, "update");
 
   // publish correction for external propagation

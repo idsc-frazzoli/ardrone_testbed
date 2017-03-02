@@ -163,8 +163,29 @@ void PoseSensorHandler::measurementCallback(const geometry_msgs::PoseWithCovaria
   r_old.block<3, 1> (3, 0) = q_err.vec() / q_err.w() * 2;
   // vision world yaw drift
   q_err = state_old.q_wv_;
-  r_old(6, 0) = -2 * (q_err.w() * q_err.z() + q_err.x() * q_err.y()) / (1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z()));
-
+//   float denominator = 1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z());
+//   float numerator = -2 * (q_err.w() * q_err.z() + q_err.x() * q_err.y());
+//   if (numerator == 0 && denominator == 0)
+//   {
+//     r_old(6,0)=0;
+//   }
+//   else{
+//     r_old(6,0)=numerator/denominator;
+//   }
+  
+  r_old(6,0) = 0;//-2 * (q_err.w() * q_err.z() + q_err.x() * q_err.y())/(1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z());
+  
   // call update step in core class
   measurements->ssf_core_.applyMeasurement(idx, H_old, r_old, R);
+//   std::cout << "x is: "<< q_err.x() << "\n";
+//   std::cout << "y is: "<< q_err.y()<< "\n";
+//   std::cout << "z is: "<< q_err.z()<< "\n";
+//   
+//   std::cout << "w is: "<< q_err.w()<< "\n";
+//   std::cout << "denominator is: "<< 1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z())<< "\n";
+//   
+//   std::cout << "r_old is: " <<r_old <<"\n";
+//   
+//   std::cout << "scale: " << state_old.L_ << std::endl;
+
 }

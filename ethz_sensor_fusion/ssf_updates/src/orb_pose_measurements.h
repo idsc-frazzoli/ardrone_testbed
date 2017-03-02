@@ -54,11 +54,16 @@ public:
     pnh.param("init/q_ci/z", q_ci_.z(), 0.0);
     q_ci_.normalize();
 
+    //						vv if (tf.exists())
+    //TODO transform listener lookuptransform world / firstkeyframe
+    //{
     pnh.param("init/q_wv/w", q_wv_.w(), 1.0);
     pnh.param("init/q_wv/x", q_wv_.x(), 0.0);
     pnh.param("init/q_wv/y", q_wv_.y(), 0.0);
     pnh.param("init/q_wv/z", q_wv_.z(), 0.0);
     q_wv_.normalize();
+    //}; THIS.init()
+    
   }
 
 private:
