@@ -10,7 +10,7 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
-#include </home/dani/ardrone_ws/devel/include/sensor_fusion_comm/DoubleArrayStamped.h>
+#include <sensor_fusion_comm/DoubleArrayStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 class ardrone_odometry
