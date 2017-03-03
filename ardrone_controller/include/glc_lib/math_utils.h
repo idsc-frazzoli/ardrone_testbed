@@ -15,7 +15,7 @@
 #include <string>
 
 
-namespace glcm{
+namespace glc{
 typedef std::vector<double> vctr;
 
 double sqr(const double x)

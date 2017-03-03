@@ -11,7 +11,7 @@
 #include <algorithm> 
 
 
-namespace glcm{
+namespace glc{
     
     class traj
     {
@@ -33,23 +33,23 @@ namespace glcm{
         
         void push(const traj& tail)
         {
-            states.reserve(states.size()+tail.states.size());
+            //states.reserve(states.size()+tail.states.size());
             states.insert(states.end(), tail.states.begin(), tail.states.end() );
-            time.reserve(time.size()+tail.time.size());
+            //time.reserve(time.size()+tail.time.size());
             time.insert(time.end(), tail.time.begin(), tail.time.end() );
-            return;
         }
         
         void pop_back()
         {
             states.pop_back();
             time.pop_back();
-            return;
+            //return;
         }
     };
-    
+
+// TODO move to glc_debug.h
     //Write trajectory out on the screen
-    void print_traj(const glcm::traj& sol)
+    void print_traj(const traj& sol)
     {
         printf("\n*****   Trajectory   *****\n");
         printf("time:  state:");
@@ -66,16 +66,9 @@ namespace glcm{
         printf("**********************************\n");
     }
     
-    class parameters
+    class Parameters
     {
     public:
-        parameters()
-        {
-            x0.clear();
-            umin.clear();
-            umax.clear();
-            ugrid.clear();
-        }
         //Initial condition
         vctr x0;
         //Discretization resolution
@@ -117,8 +110,8 @@ namespace glcm{
         }
     };
     
-    class node;
-    typedef std::shared_ptr<glcm::node> nodePtr; 
+    class node; // TODO rename to Node
+    typedef std::shared_ptr<node> nodePtr; 
     
     class node
     {
@@ -152,8 +145,8 @@ namespace glcm{
                  u_idx=control;
              }
              
-             //root constructor
-             node(parameters params,int card_omega):node(card_omega)
+        //root constructor
+        node(Parameters params,int card_omega):node(card_omega)
              {
                  children.resize(card_omega);
                  x.resize(params.state_dim);
@@ -172,15 +165,10 @@ namespace glcm{
     
     const nodePtr node::inf_cost_node(new node(0, DBL_MAX/2, 0.0, DBL_MAX/2));
     
-    class queue_order
+    class QueueOrder
     {
         
     public:
-        
-        queue_order()
-        {
-        }
-        
         bool operator()(const nodePtr& node1, const nodePtr& node2)
         {
             return node1->merit>=node2->merit;//A*     
@@ -195,7 +183,7 @@ namespace glcm{
     // //   double edgeCost;//TODO needed?
     // };
     
-    class cptrcompare{
+    class cptrcompare{ // TODO rename
     public:
         bool operator() (const nodePtr& l, const nodePtr& r)
         {
@@ -203,20 +191,20 @@ namespace glcm{
         }
     };
     
-    class domain
+    class Domain
     {
     public:
         //serves as index of partition domain
         std::vector<int> coordinate;
-        glcm::nodePtr label;
+        nodePtr label;
         
         std::priority_queue<nodePtr, std::vector<nodePtr>, cptrcompare> candidates;
         
-        domain(){
+        Domain(){
             label = node::inf_cost_node;
         }
         
-        domain(const glcm::nodePtr& _label)
+        Domain(const nodePtr& _label)
         {
             label = _label;
             coordinate=vec_floor(label->x);
@@ -227,7 +215,7 @@ namespace glcm{
         }
         
         //Lexicographical order of integer tuple for sorting stl set of domains
-        bool operator<(const domain& y) const
+        bool operator<(const Domain& y) const
         {
             assert(coordinate.size()==y.coordinate.size());
             return std::lexicographical_compare <std::vector<int>::const_iterator, std::vector<int>::const_iterator>
@@ -236,78 +224,79 @@ namespace glcm{
     };
     
     //Create a grid over the hyper-rectancle defined by umin and umax
-    void grid_control(std::deque<vctr>& controls, vctr& umin, vctr& umax, std::vector<int>& RES, int open)
-    {
-        std::deque<vctr> bucket;
-        bucket.clear();
-        vctr u(umin.size());
-        int count=1;
-        for(int i=0;i<=RES[0]-open;i++)
-        {
-            u[0]=umin.at(0)+((double) i)*(umax.at(0)-umin.at(0))/RES[0];
-            bucket.push_back(u);
-        }
-        
-        for(int k=1;k<umin.size();k++)//repeat for each channel
-        {
-            //         count*=RES[k];
-            count =bucket.size();
-            for(int j=0;j<count;j++)//go through each element in bucket
-            {
-                u=bucket.front();
-                bucket.pop_front();
-                for(int i=0;i<=RES[k]-open;i++)//and tack on all convex combos
-                {
-                    u[k]=umin.at(k)+((double) i)*(umax.at(k)-umin.at(k))/RES[k];
-                    bucket.push_back(u);
-                }
-            }
-        }
-        controls.clear();
-        std::copy(bucket.begin(), bucket.end(), std::back_inserter(controls));
-    }
+    // TODO 
+//     void grid_control(std::deque<vctr>& controls, vctr& umin, vctr& umax, std::vector<int>& RES, int open)
+//     {
+//         std::deque<vctr> bucket;
+//         bucket.clear();
+//         vctr u(umin.size());
+//         int count=1;
+//         for(int i=0;i<=RES[0]-open;i++)
+//         {
+//             u[0]=umin.at(0)+((double) i)*(umax.at(0)-umin.at(0))/RES[0];
+//             bucket.push_back(u);
+//         }
+//         
+//         for(int k=1;k<umin.size();k++)//repeat for each channel
+//         {
+//             //         count*=RES[k];
+//             count =bucket.size();
+//             for(int j=0;j<count;j++)//go through each element in bucket
+//             {
+//                 u=bucket.front();
+//                 bucket.pop_front();
+//                 for(int i=0;i<=RES[k]-open;i++)//and tack on all convex combos
+//                 {
+//                     u[k]=umin.at(k)+((double) i)*(umax.at(k)-umin.at(k))/RES[k];
+//                     bucket.push_back(u);
+//                 }
+//             }
+//         }
+//         controls.clear();
+//         std::copy(bucket.begin(), bucket.end(), std::back_inserter(controls));
+//     }
     
-    struct plannerOutput
+    struct PlannerOutput
     {
         double cost;
         double time;
     };
     
-    std::vector< std::vector<double> > omegaR(const int m, const int exp, const int R)
-    {
-        
-        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-        std::default_random_engine generator(seed);
-        std::normal_distribution<double> distribution(0.0,1.0);
-        std::vector< vctr > controls(0);
-        double normal_rv,nearest;
-        vctr input(0);
-        for(int j=0;j<100*pow(R,m);j++)
-        {
-            for(int i=0;i<m;i++)
-            {
-                normal_rv=0.0;
-                while(normal_rv == 0.0)
-                {
-                    normal_rv = (double) distribution(generator);
-                }
-                input.push_back(normal_rv);
-            }
-            input = (1.0/norm2(input))*input;
-            nearest=DBL_MAX/2.0;
-            for(int k=0;k<controls.size();k++)
-            {
-                nearest=std::min( nearest,norm2(diff(controls[k],input)) );
-            }
-            if(nearest>=0.2/ (double) R)
-            {
-                controls.push_back(input);
-            }
-            input.clear();
-        }
-        
-        return controls;
-    }
+//     std::vector< std::vector<double> > omegaR(const int m, const int exp, const int R)
+//     {
+//         
+//         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+//         std::default_random_engine generator(seed);
+//         std::normal_distribution<double> distribution(0.0,1.0);
+//         std::vector< vctr > controls(0);
+//         double normal_rv,nearest;
+//         vctr input(0);
+//         for(int j=0;j<100*pow(R,m);j++)
+//         {
+//             for(int i=0;i<m;i++)
+//             {
+//                 normal_rv=0.0;
+//                 while(normal_rv == 0.0)
+//                 {
+//                     normal_rv = (double) distribution(generator);
+//                 }
+//                 input.push_back(normal_rv);
+//             }
+//             input = (1.0/norm2(input))*input;
+//             nearest=DBL_MAX/2.0;
+//             for(int k=0;k<controls.size();k++)
+//             {
+//                 nearest=std::min( nearest,norm2(diff(controls[k],input)) );
+//             }
+//             if(nearest>=0.2/ (double) R)
+//             {
+//                 controls.push_back(input);
+//             }
+//             input.clear();
+//         }
+//         
+//         return controls;
+//     }
     
 }//end namespace
 #endif

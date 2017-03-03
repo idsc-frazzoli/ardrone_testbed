@@ -3,176 +3,22 @@
 #include <geometry_msgs/Pose.h>
 #include <visualization_msgs/MarkerArray.h>
 
-
-// 1) Create a model of the system's mobility (i.e. x'(t)=f(x(t),u(t) )
-class single_integrator: public glcm::dynamical_system
-{
-public:
-    //The function f in x'(t)=f(x(t),u(t)) 
-    void flow(glcm::vctr& dx, const glcm::vctr& x, const glcm::vctr& u)
-    {
-        //Single Integrator Model
-        for(int i=0;i<n;i++)
-        {
-            // f(x(t),u(t))=u(t)
-            dx.at(i)=u.at(i);
-        }
-        return;
-    }
-    
-    single_integrator(const int& state_dim)
-    {
-        sim_counter=0;
-        Lip_flow=0.0;
-        dt_max=1.0;
-        n = state_dim;
-        m = state_dim;
-        xdot.resize(n);
-        k1.resize(n);k2.resize(n);k3.resize(n);k4.resize(n);
-        temp.resize(n);
-    }
-};
+#include <glc_adapter.h>
 
 // 2) Create an approximation of input space 
-class control_inputs: public glcm::inputs
+class ControlInputs2D: public glc::Inputs
 {
 public:
-    std::deque<glcm::vctr> points;
-    
     //uniformly spaced points on a circle
-    control_inputs(int num_inputs,int dimension): inputs(dimension)
+    ControlInputs2D(int num_inputs)
     {
-        if(not (dimension == 2))
-        {
-            std::cout << "ERROR: Input diminsion is not 2." << std::endl;
-        }
-        points.clear();
+        glc::vctr u(num_inputs);
         for(int i=0;i<num_inputs;i++)
         {
             u[0]=sin(2.0*i*M_PI/num_inputs);
             u[1]=cos(2.0*i*M_PI/num_inputs);
-           points.push_back(u);
+            addInputSample(u);
         }
-        return;
-    }
-};
-
-// 3) Create a performance objective to be minimized (i.e. min integral of g(x(t),u(t)) )
-class min_time_objective: public glcm::costFunction
-{
-public:
-    min_time_objective()
-    {
-        n=999;
-        m=999;
-        Lip_cost=0.0;
-    }
-    min_time_objective(const int& _n, const int& _m)
-    {
-        n=_n;
-        m=_m;
-        Lip_cost=0.0;
-    }
-    //This is the function g(x(t),u(t)) in the performance objective
-    double cost(const glcm::traj& p, const glcm::vctr& u)
-    {
-        return p.time.back()-p.time.front();
-    }
-};
-
-// 4) Create an admissible heuristic for the problem
-class zero_heuristic: public glcm::heuristic//TODO redundant
-{
-public:
-    
-    zero_heuristic()
-    {}
-    //Define a ball centered at x_g of radius _rad containing the goal
-    zero_heuristic(const glcm::vctr& _x_g,const double _rad)
-    {
-        radius=_rad;
-        center=_x_g;
-    }
-    
-    //The estimated cost to reach the goal is zero
-    double cost_to_go(const glcm::vctr& x0)
-    {
-        return 0;
-    }
-    
-    void setGoal(glcm::vctr& _x_g)
-    {
-        center=_x_g;
-    }
-};
-
-// 5) Create a goal region
-class simple_goal: public glcm::goalRegion //Origin centered ball
-{
-    double goal_radius, goal_radius_sqr;
-    glcm::vctr error;
-public:
-    
-    simple_goal(const int& _state_dim, const double& _goal_radius)
-    {
-        state_dim=_state_dim;
-        goal_radius=_goal_radius;
-        goal_radius_sqr=glcm::sqr(goal_radius);
-        x_g.clear();
-        error.resize(state_dim);
-        std::vector<double> zeros(state_dim, 0.0);
-        x_g = zeros;
-    }
-    
-    bool inGoal(const glcm::vctr& state, const double& t){
-        error=glcm::diff(x_g,state); // TODO subtracting two vectors with different sizes
-        return glcm::dot(error,error)<goal_radius_sqr;
-    }
-    
-    void setGoal(const glcm::vctr& _x_g)
-    {
-        x_g=_x_g;
-    }
-    
-    std::vector<double> getGoal()
-    {
-        return x_g;
-    }
-    
-    void setRadius(double r)
-    {
-        goal_radius = r;
-        goal_radius_sqr = r*r;
-    }
-    
-    double getRadius()
-    {
-        return goal_radius;
-    }
-    
-};
-
-// 6) Create free space
-class no_obstacles: public glcm::obstacles 
-{
-public:
-    
-    no_obstacles()
-    {
-    }
-    //Returns true always
-    bool collisionFree(const glcm::traj& p)
-    {
-        counter++;
-        for(int i=0;i<p.states.size();i++)
-        {
-            //Check collision here
-            if(false)
-            {
-                return false;
-            }
-        }
-        return true;
     }
 };
 
@@ -180,18 +26,18 @@ public:
 //Wrapper around the glc algorithm for real-time functionality
 class real_time_motion_planner
 {
-    glcm::parameters alg_params;
-    single_integrator* dynamic_model;
-    min_time_objective* performance_objective;
-    no_obstacles* obstacles;
-    zero_heuristic* heuristic;
-    simple_goal* goal;
-    control_inputs* controls;
+    glc::Parameters parameters;
+    glc::DynamicalSystem* dynamic_model;
+    glc::CostFunction* performance_objective;
+    glc::Obstacles* obstacles;
+    glc::Heuristic* heuristic;
+    glc::SphericalGoal* goal;
+    glc::Inputs* controls;
     
 public:
-    glcm::plannerOutput out;
-    glcm::traj current_plan;
-    glcm::vctr current_state;
+    glc::PlannerOutput out;
+    glc::traj current_plan;
+    glc::vctr current_state;
     
     visualization_msgs::Marker traj_marker;
     geometry_msgs::Point p;
@@ -199,25 +45,27 @@ public:
 
     real_time_motion_planner():current_state({0.0,0.0})
     {
-        alg_params.res=8;
-        alg_params.control_dim = 2;
-        alg_params.state_dim = 2;
-        alg_params.depth_scale = 100;
-        alg_params.dt_max = 0.2;
-        alg_params.max_iter = 20000;
-        alg_params.time_scale = 6;
-        alg_params.partition_scale = 1.5;
-        alg_params.x0.push_back(0.0);alg_params.x0.push_back(0.0); 
+        parameters.res=8;
+        parameters.control_dim = 2;
+        parameters.state_dim = 2;
+        parameters.depth_scale = 100;
+        parameters.dt_max = 0.2;
+        parameters.max_iter = 20000;
+        parameters.time_scale = 6;
+        parameters.partition_scale = 1.5;
+        parameters.x0.push_back(0.0);parameters.x0.push_back(0.0); 
         double goal_radius = 1.0;
-        glcm::vctr xg({0.0,10.0});
+        glc::vctr xg({0.0,10.0});
 
-        dynamic_model = new single_integrator(alg_params.state_dim);
-        controls = new control_inputs(alg_params.res,alg_params.control_dim);
-        performance_objective = new min_time_objective;
-        goal = new simple_goal(alg_params.state_dim,goal_radius);
-        goal->setGoal(xg);
-        obstacles = new no_obstacles;
-        heuristic = new zero_heuristic(goal->getGoal(),goal->getRadius());
+        dynamic_model = new glc::SingleIntegrator(parameters.dt_max);
+        controls = new ControlInputs2D(parameters.res);
+        performance_objective = new glc::MinTimeCost();
+        glc::SphericalGoal* sphericalGoal = new glc::SphericalGoal(parameters.state_dim,goal_radius);
+        sphericalGoal->setGoal(xg);
+        goal = sphericalGoal;
+        
+        obstacles = new glc::NoObstacles();
+        heuristic = new glc::ZeroHeuristic();
         
         //Visualization stuff
         traj_marker.header.frame_id = "world";
@@ -240,19 +88,19 @@ public:
         return;
     }
     
-    void replan(const glcm::vctr& from_here, const glcm::vctr& to_here)
+    void replan(glc::vctr from_here,glc::vctr to_here)
     {
-        alg_params.x0=from_here;
+        parameters.x0=from_here;
         goal->setGoal(to_here);
-        glcm::trajectory_planner motion_planner(obstacles, 
+        glc::trajectory_planner motion_planner(obstacles, 
                                                 goal, 
                                                 dynamic_model, 
                                                 heuristic,
                                                 performance_objective,
-                                                alg_params,
+                                                parameters,
                                                 controls->points);
         motion_planner.plan(out);
-        glcm::print_traj(current_plan);
+        glc::print_traj(current_plan);
         std::cout << "GLC running time: " << out.time << std::endl;
         current_plan = motion_planner.recover_traj( motion_planner.path_to_root(true) );
         
@@ -269,7 +117,7 @@ public:
         return;
     }
     
-    void replan(const glcm::vctr& _from_here)
+    void replan(glc::vctr _from_here)
     {
         replan(_from_here, goal->getGoal());
         return;
