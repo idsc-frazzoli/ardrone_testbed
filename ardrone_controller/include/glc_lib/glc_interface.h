@@ -119,7 +119,7 @@ namespace glc{
             for(int i=0;i<num_steps;i++)
             {
                 step(x1,sol.getState(i),u,dt);
-                sol.set(i, x1, sol.getTime(i)+dt);
+                sol.set(i+1, x1, sol.getTime(i)+dt);
                 //sol.time.at(i+1)=sol.time.at(i)+dt;
             }
             sim_counter++;
