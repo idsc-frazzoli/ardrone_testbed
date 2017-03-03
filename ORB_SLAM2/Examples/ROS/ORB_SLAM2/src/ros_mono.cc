@@ -214,6 +214,13 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	for(auto& x:pose_out_.pose.covariance)
 	  x = 0.0;
 	
+	pose_out_.pose.covariance[0] = 1;
+	pose_out_.pose.covariance[7] = 1;
+	pose_out_.pose.covariance[14] = 1;
+	pose_out_.pose.covariance[21] = 1;
+	pose_out_.pose.covariance[28] = 1;
+	pose_out_.pose.covariance[35] = 1;
+	
 // 	pose_out.pose.covariance. = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 // 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 // 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
