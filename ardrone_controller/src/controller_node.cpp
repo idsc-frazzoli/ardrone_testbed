@@ -2,6 +2,7 @@
 #include <std_msgs/String.h>
 #include <sstream>
 #include <sensor_msgs/Imu.h>
+#include <nav_msgs/Odometry.h>
 #include <vector>
 #include <assert.h>
 #include <ros/time.h>
@@ -10,8 +11,8 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
-
-
+#include <sensor_fusion_comm/DoubleArrayStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 class ardrone_odometry
 {
@@ -30,9 +31,8 @@ public:
     tf::Quaternion quat_cam_drone;
     tf::TransformBroadcaster br;
     tf::Transform level;
-    
-    
-    
+    geometry_msgs::PoseWithCovarianceStamped ekf_pose_out_;
+    nav_msgs::Odometry ekf_odom_out_;
     
     ardrone_odometry():count(0)
     {
@@ -91,7 +91,7 @@ public:
         //try to get stuff from tf node
         try{
             tf::StampedTransform slam_tf;
-            slam_listener.lookupTransform("/level", "/odom",ros::Time(0), slam_tf);
+            //slam_listener.lookupTransform("/level", "/camera",ros::Time(0), slam_tf);
             slam_quat = slam_tf.getRotation();
             slam_pos = slam_tf.getOrigin();
         }
@@ -111,8 +111,31 @@ public:
         level.setOrigin(origin);
         level.setRotation(quat_cam_drone);
         odom_pos = tf::quatRotate(quat_cam_drone,slam_pos);
-        br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "/world", "/level"));
+        //br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "/ardrone_base_link", "/level"));
         
+    }
+    
+    void EKF_callback(sensor_fusion_comm::DoubleArrayStamped msg)
+    {
+	ekf_pose_out_.pose.pose.position.x = msg.data[0];
+	ekf_pose_out_.pose.pose.position.y = msg.data[1];
+	ekf_pose_out_.pose.pose.position.z = msg.data[2];
+	
+	ekf_pose_out_.pose.pose.orientation.x = msg.data[7];
+	ekf_pose_out_.pose.pose.orientation.y = msg.data[8];
+	ekf_pose_out_.pose.pose.orientation.z = msg.data[9];
+	ekf_pose_out_.pose.pose.orientation.w = msg.data[6];
+	
+	ekf_pose_out_.header.frame_id = "world";
+	ekf_pose_out_.header.stamp = ros::Time::now();
+	
+	ekf_odom_out_.header.stamp = ros::Time::now();
+	ekf_odom_out_.pose.covariance = ekf_pose_out_.pose.covariance;
+	ekf_odom_out_.pose.covariance[1] = 10000;
+	ekf_odom_out_.pose.pose = ekf_pose_out_.pose.pose;
+	ekf_odom_out_.header.frame_id = "world";
+	ekf_odom_out_.child_frame_id = "v_odom";
+	
     }
     
 };
@@ -125,14 +148,20 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
     
     ros::Subscriber imu_sub = n.subscribe<sensor_msgs::Imu>( "/ardrone/imu", 10,  &ardrone_odometry::imu_msg_callback, &odometer);
+    ros::Subscriber EKF_sub = n.subscribe<sensor_fusion_comm::DoubleArrayStamped>("/ssf_core/state_out", 2, &ardrone_odometry::EKF_callback, &odometer); 
+    ros::Publisher ekf_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/ekf_pose", 2);
+    ros::Publisher ekf_publisher = n.advertise<nav_msgs::Odometry>("/vo",2);
     
-    ros::Rate loop_rate(10);//the received msg is published at 200Hz.
+    ros::Rate loop_rate(30);//the received msg is published at 200Hz.
     while (ros::ok())
-    {      
+    {    
         odometer.get_slam_tf();
         odometer.broadcast_rel_tf();
         ros::spinOnce();
         
+	ekf_pub.publish(odometer.ekf_pose_out_);
+	ekf_publisher.publish(odometer.ekf_odom_out_);
+	
         loop_rate.sleep();
     }
     

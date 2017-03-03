@@ -18,14 +18,22 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   geometry_msgs
   tf
+  message_generation
+  sensor_fusion_comm
 )
 
+catkin_package(
+  INCLUDE_DIRS include include/glc_lib
+  CATKIN_DEPENDS roscpp std_msgs sensor_fusion_comm message_runtime
+)
 
-catkin_package(INCLUDE_DIRS include/glc_lib)
+#catkin_package(INCLUDE_DIRS include/glc_lib)
 
 include_directories(${glc_includes})
 include_directories(include/glc_lib)
 include_directories(${catkin_INCLUDE_DIRS})
+
+#add_message_files(FILES DoubleArrayStamped.msg)
 
 add_executable(controller_node src/controller_node.cpp)
 add_executable(imu_calibration_node src/imu_calibration_node.cpp)

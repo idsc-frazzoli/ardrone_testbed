@@ -29,12 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef ORB_MEASUREMENTS_H
-#define ORB_MEASUREMENTS_H
+#ifndef ORB_POSE_MEASUREMENTS_H
+#define ORB_POSE_MEASUREMENTS_H
 
 #include <ros/ros.h>
 #include <ssf_core/measurement.h>
-#include "orb_sensor.h"
+#include "orb_pose_sensor.h"
 
 class OrbPoseMeasurements : public ssf_core::Measurements
 {
@@ -54,11 +54,16 @@ public:
     pnh.param("init/q_ci/z", q_ci_.z(), 0.0);
     q_ci_.normalize();
 
+    //						vv if (tf.exists())
+    //TODO transform listener lookuptransform world / firstkeyframe
+    //{
     pnh.param("init/q_wv/w", q_wv_.w(), 1.0);
     pnh.param("init/q_wv/x", q_wv_.x(), 0.0);
     pnh.param("init/q_wv/y", q_wv_.y(), 0.0);
     pnh.param("init/q_wv/z", q_wv_.z(), 0.0);
     q_wv_.normalize();
+    //}; THIS.init()
+    
   }
 
 private:
@@ -107,4 +112,4 @@ private:
   }
 };
 
-#endif /* POSE_MEASUREMENTS_H */
+#endif /* ORB_POSE_MEASUREMENTS_H */
