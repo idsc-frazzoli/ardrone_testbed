@@ -108,12 +108,12 @@ template<class T>
   {
     for (int i = 0; i < size; i++)
     {
-      if (isnan(vec[i]))
+      if (std::isnan(vec[i]))
       {
         std::cerr << "=== ERROR ===  " << info << ": NAN at index " << i << std::endl;
         return false;
       }
-      if (isinf(vec[i]))
+      if (std::isinf(vec[i]))
       {
         std::cerr << "=== ERROR ===  " << info << ": INF at index " << i << std::endl;
         return false;
