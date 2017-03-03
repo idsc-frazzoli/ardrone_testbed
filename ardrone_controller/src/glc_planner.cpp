@@ -1,6 +1,7 @@
 #include <glc_planner.h>
 #include <ros/ros.h>
 #include <geometry_msgs/Pose.h>
+#include <visualization_msgs/MarkerArray.h>
 
 
 // 1) Create a model of the system's mobility (i.e. x'(t)=f(x(t),u(t) )
@@ -191,6 +192,10 @@ public:
     glcm::plannerOutput out;
     glcm::traj current_plan;
     glcm::vctr current_state;
+    
+    visualization_msgs::Marker traj_marker;
+    geometry_msgs::Point p;
+    
 
     real_time_motion_planner():current_state({0.0,0.0})
     {
@@ -213,6 +218,19 @@ public:
         goal->setGoal(xg);
         obstacles = new no_obstacles;
         heuristic = new zero_heuristic(goal->getGoal(),goal->getRadius());
+        
+        //Visualization stuff
+        traj_marker.header.frame_id = "world";
+        traj_marker.ns = "trajectory_visualisation";
+        traj_marker.id = 2;
+        traj_marker.type = visualization_msgs::Marker::CUBE_LIST;
+        traj_marker.scale.x = 0.1;
+        traj_marker.scale.y = 0.1;
+        traj_marker.scale.z = 0.1;
+        traj_marker.color.a = 1.0;
+        traj_marker.color.r = 1.0;
+        traj_marker.color.g = 1.0;
+        traj_marker.color.b = 1.0;
     }
     
     void update_pose(geometry_msgs::Pose pose_msg)
@@ -233,11 +251,21 @@ public:
                                                 performance_objective,
                                                 alg_params,
                                                 controls->points);
-
         motion_planner.plan(out);
-        current_plan = motion_planner.recover_traj( motion_planner.path_to_root(true) );
         glcm::print_traj(current_plan);
         std::cout << "GLC running time: " << out.time << std::endl;
+        current_plan = motion_planner.recover_traj( motion_planner.path_to_root(true) );
+        
+        //Send traj markers to rviz
+        traj_marker.points.clear();
+        for(int i=0;i<current_plan.states.size();i++)
+        {
+            p.x=current_plan.states[i][0];
+            p.y=current_plan.states[i][1];
+            p.z=0.0;
+            
+            traj_marker.points.push_back(p);
+        }
         return;
     }
     
@@ -257,7 +285,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "motion_planner");
     ros::NodeHandle nh;
     ros::Subscriber pose_sub = nh.subscribe<geometry_msgs::Pose>( "quad_pose", 10,  &real_time_motion_planner::update_pose, &rtmp);
-    ros::Publisher planner_pub = nh.advertise<geometry_msgs::Pose>("reference_trajectory", 2);
+    ros::Publisher planner_pub = nh.advertise<visualization_msgs::Marker>("reference_trajectory", 2);
     
     
     ros::Rate loop_rate(2);
@@ -267,7 +295,7 @@ int main(int argc, char **argv)
         
         rtmp.replan(rtmp.current_state);//TODO this needs to be a predicted state in the future
         ros::spinOnce();
-//         planner_pub.publish(traj_msg);
+        planner_pub.publish(rtmp.traj_marker);
         loop_rate.sleep();
     }
     
