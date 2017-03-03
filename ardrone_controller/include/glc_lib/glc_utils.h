@@ -13,11 +13,11 @@
 
 namespace glc{
     
-    class traj
+    class Trajectory
     {
-    public:
         std::vector<vctr> states;
-        vctr time;
+        std::vector<double> time;
+    public:
         
         void clear()
         {
@@ -31,7 +31,7 @@ namespace glc{
             time.resize(n);
         }
         
-        void push(const traj& tail)
+        void push(const Trajectory& tail)
         {
             //states.reserve(states.size()+tail.states.size());
             states.insert(states.end(), tail.states.begin(), tail.states.end() );
@@ -45,21 +45,68 @@ namespace glc{
             time.pop_back();
             //return;
         }
+        
+        void back(vctr& x, double& t) {
+            x=states.back();
+            t=time.back();
+        }
+        
+        int size() const
+        {
+            return time.size();
+        }
+        
+        void get(int index, vctr& x, double& t) const
+        {
+            x=states[index];
+            t=time[index];
+        }
+        const vctr& getState(int index) const
+        {
+            return states[index];
+        }
+        
+        void set(int index, const vctr& x, double t) {
+            states[index]=x;
+            time[index]=t;
+        }
+        const double& getTime(int index) const
+        {
+            return time[index];
+        }
+        
+        double getDuration() const 
+        {
+            return time.back() - time.front();
+        }
+        
+        double getEndTime() const 
+        {
+            return time.back();
+        }
+        
+        double getDurationFrom(int index) const
+        {
+            return time.back() - time.at(index);
+        }
     };
 
 // TODO move to glc_debug.h
     //Write trajectory out on the screen
-    void print_traj(const traj& sol)
+    void print_traj(const Trajectory& sol)
     {
         printf("\n*****   Trajectory   *****\n");
         printf("time:  state:");
         printf("\n");
-        for(int i=0;i<sol.time.size();i++)
+        for(int i=0;i<sol.size();i++)
         {
-            printf("%4.2f:  (",sol.time.at(i));
-            for(int j=0;j<(sol.states[0]).size();j++)
+            vctr x;
+            double t;
+            sol.get(i, x, t);
+            printf("%4.2f:  (",t);
+            for(int j=0;j<x.size();j++)
             {
-                printf("%4.2f, ",sol.states[i][j]);
+                printf("%4.2f, ",x[j]);
             }
             printf(")\n");
         }
@@ -87,10 +134,7 @@ namespace glc{
         int depth_scale;
         //integration step
         double dt_max;
-        vctr umin;
-        vctr umax;
         //scaling of grid
-        std::vector<double> ugrid;
         
         void print_params()
         {
@@ -103,8 +147,6 @@ namespace glc{
             std::cout << "depth_scale " << depth_scale << std::endl;
             std::cout << "dt_max_scale " << partition_scale << std::endl;
             std::cout << "size of x0 " << x0.size() << std::endl;
-            std::cout << "size of umin " << umin.size() << std::endl;
-            std::cout << "size of umax " << umin.size() << std::endl;
             
             return;        
         }
@@ -178,7 +220,7 @@ namespace glc{
     
     // struct candidate{
     //     glcm::node path;
-    // //   glcm::traj traj;
+    // //   glcm::Trajectory Trajectory;
     // //   double pathCost;
     // //   double edgeCost;//TODO needed?
     // };

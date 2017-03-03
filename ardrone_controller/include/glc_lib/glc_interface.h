@@ -20,8 +20,7 @@ namespace glc{
     
     class Heuristic
     {
-    public:
-        
+    public: 
         virtual double costToGo(const vctr& x0)=0; 
     }; 
     
@@ -31,7 +30,7 @@ namespace glc{
     public:
         CostFunction(double _lipschitz_constant):lipschitz_constant(_lipschitz_constant){}
         
-        virtual double cost(const traj& candidate, const vctr& u)=0;
+        virtual double cost(const Trajectory& candidate, const vctr& u)=0;
         
         double getLipschitzConstant()
         {
@@ -43,10 +42,10 @@ namespace glc{
     {
         
     public:
-        virtual bool inGoal(const traj& x, int* last=NULL)
+        virtual bool inGoal(const Trajectory& x, int* last=NULL)
         { 
-            for(int i=0;i<x.time.size();i++) {
-                if(inGoal(x.states[i], x.time[i])){
+            for(int i=0;i<x.size();i++) {
+                if(inGoal(x.getState(i), x.getTime(i))){
                     if(last)
                         *last = i;
                     return true;
@@ -63,10 +62,10 @@ namespace glc{
     public:
         int counter=0;
         //check pointwise for collision    
-        virtual bool collisionFree(const traj& x, int* last=NULL)
+        virtual bool collisionFree(const Trajectory& x, int* last=NULL)
         { 
-            for(int i=0;i<x.time.size();i++) {
-                if(not collisionFree(x.states[i], x.time[i]))
+            for(int i=0;i<x.size();i++) {
+                if(not collisionFree(x.getState(i), x.getTime(i)))
                 {
                     if(last)
                         *last = i;
@@ -102,7 +101,7 @@ namespace glc{
         virtual void step(vctr& x_plus, const vctr& x, const vctr& u, const double dt)=0;
         
         
-        void sim(glc::traj& sol, double t0, double tf, const vctr& x0, const vctr& u)
+        void sim(glc::Trajectory& sol, double t0, double tf, const vctr& x0, const vctr& u)
         {
             assert(tf>t0);
             
@@ -110,25 +109,27 @@ namespace glc{
             double num_steps=ceil((tf-t0)/max_time_step);
             double dt=(tf-t0)/num_steps;
             //resize solution
-            sol.states.resize(num_steps+1);
-            sol.time.resize(num_steps+1);
+            sol.resize(num_steps+1);
             
             //set initial condition
-            sol.states.at(0)=x0;
+            //sol.setState(x0);
+            sol.set(0, x0, t0);
+            vctr x1;
             //integrate
             for(int i=0;i<num_steps;i++)
             {
-                step(sol.states.at(i+1),sol.states.at(i),u,dt);
-                sol.time.at(i+1)=sol.time.at(i)+dt;
+                step(x1,sol.getState(i),u,dt);
+                sol.set(i, x1, sol.getTime(i)+dt);
+                //sol.time.at(i+1)=sol.time.at(i)+dt;
             }
             sim_counter++;
             return;
         }
         
         //integrate forward for tspan from x0 with constant u
-        traj sim(double t0, double tf, const vctr& x0, const vctr& u)
+        Trajectory sim(double t0, double tf, const vctr& x0, const vctr& u)
         {
-            traj sol;
+            Trajectory sol;
             sim(sol, t0, tf, x0, u);
             
             return sol;

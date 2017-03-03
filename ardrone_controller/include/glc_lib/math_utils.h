@@ -13,10 +13,10 @@
 #include <sstream>
 #include <fstream>
 #include <string>
-
+#include <valarray>
 
 namespace glc{
-typedef std::vector<double> vctr;
+typedef std::valarray<double> vctr;
 
 double sqr(const double x)
 {
@@ -46,47 +46,40 @@ void normSquare(const vctr& x, double& y)
 
 /*** Vector Operations ***/
 
-vctr operator+(const vctr& x, const vctr& y)
-{
-    assert(x.size()==y.size());
-    vctr z(x.size());
-    for(int i=0;i<x.size();i++)
-    {
-        z.at(i)=x.at(i)+y.at(i);
-    }
-    
-    return z;
-}
+// vctr operator+(const vctr& x, const vctr& y)
+// {
+//     assert(x.size()==y.size());
+//     vctr z(x.size());
+//     for(int i=0;i<x.size();i++)
+//     {
+//         z.at(i)=x.at(i)+y.at(i);
+//     }
+//     
+//     return z;
+// }
 
 vctr diff(const vctr& x, const vctr& y)
 {
-    //assert(x.size()==y.size()); // HACK put this back in later
-    vctr z(x.size());
-    for(int i=0;i<x.size();i++)
-    {
-        z.at(i)=x.at(i)-y.at(i);
-    }
-    
-    return z;
+    return x-y;
 }
 
-vctr operator*(const double& c, const vctr& x)
-{
-    vctr z(x.size());
-    for(int i=0;i<x.size();i++)
-    {
-        z.at(i)=c*x.at(i);
-    }
-    
-    return z;
-}
+// vctr operator*(const double& c, const vctr& x)
+// {
+//     vctr z(x.size());
+//     for(int i=0;i<x.size();i++)
+//     {
+//         z.at(i)=c*x.at(i);
+//     }
+//     
+//     return z;
+// }
 
 std::vector<int> vec_floor(vctr& x)
 {
     std::vector<int> floored(x.size());
     for(int i=0;i<x.size();i++)
     {
-        floored.at(i)=(int)floor(x.at(i));
+        floored.at(i)=(int)floor(x[i]);
     }
     return floored;
 }
@@ -98,7 +91,7 @@ double dot(const vctr& x,const vctr& y)
     double z=0;
     for(int i=0;i<y.size();i++)
     {
-        z += x.at(i)*y.at(i);
+        z += x[i]*y[i];
     }
     
     return z;
@@ -109,7 +102,7 @@ double norm2(const vctr& x)
     double norm=0;
     for(int i=0; i<x.size(); i++)
     {
-        norm=norm+sqr(x.at(i));
+        norm=norm+sqr(x[i]);
     }
     return std::sqrt(norm);
 }
@@ -119,13 +112,10 @@ double norm_sqr(const vctr& x)
     double norm=0;
     for(int i=0; i<x.size(); i++)
     {
-        norm=norm+sqr(x.at(i));
+        norm=norm+sqr(x[i]);
     }
     return norm;
 }
 
 }
-
-
-
 #endif

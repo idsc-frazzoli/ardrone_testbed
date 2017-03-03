@@ -36,7 +36,7 @@ class real_time_motion_planner
     
 public:
     glc::PlannerOutput out;
-    glc::traj current_plan;
+    glc::Trajectory current_plan;
     glc::vctr current_state;
     
     visualization_msgs::Marker traj_marker;
@@ -53,7 +53,7 @@ public:
         parameters.max_iter = 20000;
         parameters.time_scale = 6;
         parameters.partition_scale = 1.5;
-        parameters.x0.push_back(0.0);parameters.x0.push_back(0.0); 
+        parameters.x0 = glc::vctr({0.0,0.0});
         double goal_radius = 1.0;
         glc::vctr xg({0.0,10.0});
 
@@ -104,12 +104,14 @@ public:
         std::cout << "GLC running time: " << out.time << std::endl;
         current_plan = motion_planner.recover_traj( motion_planner.path_to_root(true) );
         
-        //Send traj markers to rviz
+        //Send Trajectory markers to rviz
         traj_marker.points.clear();
-        for(int i=0;i<current_plan.states.size();i++)
+        glc::vctr x;
+        for(int i=0;i<current_plan.size();i++)
         {
-            p.x=current_plan.states[i][0];
-            p.y=current_plan.states[i][1];
+            x=current_plan.getState(i);
+            p.x=x[0];
+            p.y=x[1];
             p.z=0.0;
             
             traj_marker.points.push_back(p);

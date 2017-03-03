@@ -68,14 +68,14 @@ namespace glc{
         void switch_root(); // temp
         void remove_subtree(nodePtr& root); // TODO domains should clear if empty
         std::vector<nodePtr> path_to_root(bool forward=false);
-        traj recover_traj(const std::vector<nodePtr>& path);
+        Trajectory recover_traj(const std::vector<nodePtr>& path);
         
         
         //Planner methods
         void expand();
         void plan(PlannerOutput& out);
         void plan();
-        bool get_solution(traj& traj_out);
+        bool get_solution(Trajectory& traj_out);
         
         
         //ctor
@@ -173,7 +173,7 @@ namespace glc{
         
         //A set of domains visited by new nodes made by expand
         std::set<Domain*> domains_needing_update; 
-        std::map<nodePtr, traj> traj_from_parent;
+        std::map<nodePtr, Trajectory> traj_from_parent;
         
         //Expand top of queue and store arcs in 
         for(int i=0;i<controls.size();i++)
@@ -181,12 +181,13 @@ namespace glc{
             nodePtr new_arc(new node(controls.size()));
             traj_from_parent[new_arc] = dynamics->sim( current_node->t, current_node->t+expand_time , current_node->x, controls[i]);//not the intended use of path member
             new_arc->cost = cf->cost(traj_from_parent[new_arc], controls[i])+current_node->cost;
-            new_arc->merit = new_arc->cost + h->costToGo(traj_from_parent[new_arc].states.back());
-            new_arc->u_idx = i;
-            new_arc->x = traj_from_parent[new_arc].states.back();
-            new_arc->t = traj_from_parent[new_arc].time.back();
             
-            vctr w = partition_scale*(traj_from_parent[new_arc].states.back());
+            traj_from_parent[new_arc].back(new_arc->x, new_arc->t);
+            
+            new_arc->merit = new_arc->cost + h->costToGo(new_arc->x);
+            new_arc->u_idx = i;
+            
+            vctr w = partition_scale * new_arc->x;
             Domain d_new;
             d_new.coordinate = vec_floor( w );
             
@@ -240,11 +241,11 @@ namespace glc{
                             std::cout << "\n\nFound goal at iter: " << iter << std::endl;
                             best=curr;
                             //TODO not consistent with anything other than min-time cost here
-                            double tail_cost = (traj_from_parent[curr].time.back()-traj_from_parent[curr].time[num-1])*
+                            double tail_cost = traj_from_parent[curr].getDurationFrom(num-1)*
                             (1.0+(cf->getLipschitzConstant())*sqr(controls[best->u_idx][0]));
                             std::cout << "         Tail cost: " << tail_cost << std::endl;
                             std::cout << "    cost from root: " << curr->cost << std::endl;
-                            std::cout << "          End time: " <<  traj_from_parent[curr].time.back() << std::endl;
+                            std::cout << "          End time: " <<  traj_from_parent[curr].getEndTime() << std::endl;
                             UPPER=curr->cost-tail_cost;
                             
                         }    
@@ -303,13 +304,13 @@ namespace glc{
     }
     
     //return the planned trajectory
-    traj trajectory_planner::recover_traj(const std::vector<nodePtr>& path)
+    Trajectory trajectory_planner::recover_traj(const std::vector<nodePtr>& path)
     {
         int i=0;
         double t0=0;
         double tf=expand_time;
         nodePtr current = path[0];
-        traj arc,opt_sol;
+        Trajectory arc,opt_sol;
         if(path.size()<2)
         {
             opt_sol.clear();
@@ -326,7 +327,7 @@ namespace glc{
                 arc.pop_back();
             }
             opt_sol.push(arc);
-            t0 = arc.time.back();
+            t0 = arc.getEndTime();
             tf = t0+expand_time;
         }
         

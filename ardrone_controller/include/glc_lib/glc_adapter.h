@@ -19,9 +19,9 @@ namespace glc{
     public:
         MinTimeCost():CostFunction(0.0){}
         
-        double cost(const traj& p, const vctr& u) override 
+        double cost(const Trajectory& p, const vctr& u) override 
         {
-            return p.time.back()-p.time.front();
+            return p.getDuration();
         }
     };
     
@@ -37,7 +37,6 @@ namespace glc{
             //state_dim=_state_dim;
             goal_radius=_goal_radius;
             goal_radius_sqr=sqr(goal_radius);
-            x_g.clear();
             error.resize(_state_dim);
         }
         
@@ -72,7 +71,7 @@ namespace glc{
     class NoObstacles: public Obstacles //No obs 
     {
     public:        
-        bool collisionFree(const traj& x, int* last=NULL) override
+        bool collisionFree(const Trajectory& x, int* last=NULL) override
         {
             return true;
         }
