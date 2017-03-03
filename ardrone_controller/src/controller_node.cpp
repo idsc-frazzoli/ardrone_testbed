@@ -2,6 +2,7 @@
 #include <std_msgs/String.h>
 #include <sstream>
 #include <sensor_msgs/Imu.h>
+#include <nav_msgs/Odometry.h>
 #include <vector>
 #include <assert.h>
 #include <ros/time.h>
@@ -31,6 +32,7 @@ public:
     tf::TransformBroadcaster br;
     tf::Transform level;
     geometry_msgs::PoseWithCovarianceStamped ekf_pose_out_;
+    nav_msgs::Odometry ekf_odom_out_;
     
     ardrone_odometry():count(0)
     {
@@ -126,6 +128,14 @@ public:
 	
 	ekf_pose_out_.header.frame_id = "world";
 	ekf_pose_out_.header.stamp = ros::Time::now();
+	
+	ekf_odom_out_.header.stamp = ros::Time::now();
+	ekf_odom_out_.pose.covariance = ekf_pose_out_.pose.covariance;
+	ekf_odom_out_.pose.covariance[1] = 10000;
+	ekf_odom_out_.pose.pose = ekf_pose_out_.pose.pose;
+	ekf_odom_out_.header.frame_id = "world";
+	ekf_odom_out_.child_frame_id = "v_odom";
+	
     }
     
 };
@@ -140,8 +150,9 @@ int main(int argc, char **argv)
     ros::Subscriber imu_sub = n.subscribe<sensor_msgs::Imu>( "/ardrone/imu", 10,  &ardrone_odometry::imu_msg_callback, &odometer);
     ros::Subscriber EKF_sub = n.subscribe<sensor_fusion_comm::DoubleArrayStamped>("/ssf_core/state_out", 2, &ardrone_odometry::EKF_callback, &odometer); 
     ros::Publisher ekf_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/ekf_pose", 2);
+    ros::Publisher ekf_publisher = n.advertise<nav_msgs::Odometry>("/vo",2);
     
-    ros::Rate loop_rate(10);//the received msg is published at 200Hz.
+    ros::Rate loop_rate(30);//the received msg is published at 200Hz.
     while (ros::ok())
     {    
         odometer.get_slam_tf();
@@ -149,6 +160,7 @@ int main(int argc, char **argv)
         ros::spinOnce();
         
 	ekf_pub.publish(odometer.ekf_pose_out_);
+	ekf_publisher.publish(odometer.ekf_odom_out_);
 	
         loop_rate.sleep();
     }

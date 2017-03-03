@@ -157,9 +157,13 @@ void PoseSensorHandler::measurementCallback(const geometry_msgs::PoseWithCovaria
   // construct residuals
   // position
   r_old.block<3, 1> (0, 0) = z_p_ - C_wv.transpose() * (state_old.p_ + C_q.transpose() * state_old.p_ci_) * state_old.L_;
-  // attitude
+  
+  // attitude 
   Eigen::Quaternion<double> q_err;
   q_err = (state_old.q_wv_ * state_old.q_ * state_old.q_ci_).conjugate() * z_q_;
+  
+  //std::cout << "q_err is: " << q_err << std::endl;
+  
   r_old.block<3, 1> (3, 0) = q_err.vec() / q_err.w() * 2;
   // vision world yaw drift
   q_err = state_old.q_wv_;
@@ -177,15 +181,15 @@ void PoseSensorHandler::measurementCallback(const geometry_msgs::PoseWithCovaria
   
   // call update step in core class
   measurements->ssf_core_.applyMeasurement(idx, H_old, r_old, R);
-//   std::cout << "x is: "<< q_err.x() << "\n";
-//   std::cout << "y is: "<< q_err.y()<< "\n";
-//   std::cout << "z is: "<< q_err.z()<< "\n";
-//   
-//   std::cout << "w is: "<< q_err.w()<< "\n";
-//   std::cout << "denominator is: "<< 1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z())<< "\n";
-//   
-//   std::cout << "r_old is: " <<r_old <<"\n";
-//   
-//   std::cout << "scale: " << state_old.L_ << std::endl;
+  std::cout << "x is: "<< q_err.x() << "\n";
+  std::cout << "y is: "<< q_err.y()<< "\n";
+  std::cout << "z is: "<< q_err.z()<< "\n";
+  
+  std::cout << "w is: "<< q_err.w()<< "\n";
+  std::cout << "denominator is: "<< 1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z())<< "\n";
+  
+  std::cout << "r_old is: " <<r_old <<"\n";
+  
+  std::cout << "scale: " << state_old.L_ << std::endl;
 
 }
