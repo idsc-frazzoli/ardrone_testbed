@@ -172,8 +172,17 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	// 	tf::TransformListener listener1;
 
 // 	listener1.lookupTransform("/world", "/ardrone_base_link", ros::Time(0), pose_out_tf); // orientation of odom wrt world
-	pose_out_.header.frame_id = "/first_keyframe";
+	pose_out_.header.frame_id = "odom"; //<<<<<<<< the heade frame id changed from first keyframe to odom
 	pose_out_.header.stamp = t;
+	
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//TODO: Here we have to implement the pose of the orb with respect to the odom frame.
+	// This means also that we have to get rid of the many transfomations, the ORB node is
+	//doing at the moment and just go back to where we started with a pose in the odom (aka world)
+	//frame!
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////\/////////////////////////////////////////////////////////////////////////////
 	
 	tf::Quaternion pose_orientation = pose_out_tf.getRotation();
 	tf::Vector3 pose_origin = pose_out_tf.getOrigin();
@@ -220,14 +229,6 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	pose_out_.pose.covariance[21] = 1;
 	pose_out_.pose.covariance[28] = 1;
 	pose_out_.pose.covariance[35] = 1;
-	
-// 	pose_out.pose.covariance. = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-// 				//    pose_out.pose.cova
     }
     
     // gets points from most recent frame
