@@ -68,3 +68,8 @@ cd ardrone_ws/
 catkin_make
 ```
 
+
+## Possible issues
+OpenCV requires gkt2 and ORB_SLAM will crash if both gtk2 and gtk3 are installed
+CMakelists are currently checking for OpenCV 3.2, but any version will work. We can check for version 3.0 if needed.
+
