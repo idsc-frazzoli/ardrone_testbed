@@ -20,29 +20,43 @@ You will have to follow the setup instructions in the readme for this package VE
 
 
 ##Catkin Setup
-1) You should create a local catking workspace for the packages:
+1) You should create a local catkin workspace for the packages. Wherever you will have the top level directory run:
 
 ```
 mkdir ardrone_ws && cd ardrone_ws && mkdir src 
 ``` 
-2) Clone the packages in the src folder
+2) Go into the src folder and clone the project
 
 ```
 cd ardrone_ws/src
 git clone git@github.mit.edu:bapaden/ardrone_glc.git
 ```
 
-3) Build ORB_SLAM without catkin since it uses the old ROS build system. Follow the directions on the orb slam git repo carefully.
-
-4) Initialize the catkin workspace
+3) Go to the ORB_SLAM folder:
 
 ```
-cd ardrone_ws/ardrone_glc/src
+cd ardrone_ws/src/ardrone_glc/ORB_SLAM
+```
+
+4) Install the dependancies described here: [Monocular slam repo](https://github.com/raulmur/ORB_SLAM2)
+
+5) Compile ORB_SLAM. In the ORB_SLAM directory:
+
+```
+build_ros.sh
+```
+
+6) create a catkin_workspace
+
+```
+cd ardrone_ws/src/
 catkin_init_workspace
-cd ..
+``` 
+
+7) Run catkin_make to compile everything in the project
+
+```
+cd ardrone_ws/
 catkin_make
 ```
- 
-
-
 

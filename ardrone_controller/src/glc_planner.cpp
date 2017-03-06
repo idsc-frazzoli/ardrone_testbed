@@ -49,7 +49,7 @@ public:
         parameters.control_dim = 2;
         parameters.state_dim = 2;
         parameters.depth_scale = 100;
-        parameters.dt_max = 0.2;
+        parameters.dt_max = 1.0;
         parameters.max_iter = 20000;
         parameters.time_scale = 6;
         parameters.partition_scale = 1.5;
