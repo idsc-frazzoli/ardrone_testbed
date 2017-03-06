@@ -1,7 +1,15 @@
 # AR drone workspace
 This git repo contains the ROS packages for running the AR drone autonomously
 
-##Packages
+## Code Style Suggestions
+class names: MyClass
+class object names: myObject
+variable names: my_variable
+file_names: my_header.h, my_source_file.cpp
+
+All member variables in a class should be private with commented functions for accessing (or modifying) those variables.
+
+## Packages
 --ardrone_autonomy
 This is the driver that lets us communicate with the drone through ROS. It is more or less identical to the repo here:
 
