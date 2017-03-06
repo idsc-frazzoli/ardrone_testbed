@@ -1,0 +1,4 @@
+<launch>
+  <node name="motion_planner_node" pkg="ardrone_controller" type="motion_planner_node"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="../../master_config.rviz"/>
+</launch>
