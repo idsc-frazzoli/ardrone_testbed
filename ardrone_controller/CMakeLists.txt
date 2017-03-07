@@ -38,8 +38,10 @@ include_directories(${catkin_INCLUDE_DIRS})
 add_executable(controller_node src/controller_node.cpp)
 add_executable(imu_calibration_node src/imu_calibration_node.cpp)
 add_executable(motion_planner_node src/glc_planner.cpp)
+add_executable(scale_estimator src/scale_estimator.cpp)
 
 target_link_libraries(controller_node ${catkin_LIBRARIES})
 target_link_libraries(imu_calibration_node ${catkin_LIBRARIES})
 target_link_libraries(motion_planner_node ${catkin_LIBRARIES})
+target_link_libraries(scale_estimator ${catkin_LIBRARIES})
 
