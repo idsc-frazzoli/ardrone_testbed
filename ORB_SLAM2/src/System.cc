@@ -1,3 +1,4 @@
+// modified to include  #include <unistd.h> from J. Londschien
 
 /**
 * This file is part of ORB-SLAM2.
@@ -27,6 +28,7 @@
 #include <thread>
 #include <pangolin/pangolin.h>
 #include <iomanip>
+#include <unistd.h>
 
 namespace ORB_SLAM2
 {
