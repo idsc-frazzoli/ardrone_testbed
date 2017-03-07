@@ -223,35 +223,34 @@ int main(int argc, char **argv)
     ImageGrabber imageGrabber(&SLAM);
     
     ros::NodeHandle nodeHandler;
-    ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&imageGrabber);
-    ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/environment/point_cloud", 2);
-    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("/orb_pose_measurement",2);
+    ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 10, &ImageGrabber::GrabImage,&imageGrabber);
+    ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/environment/point_cloud", 1);
+    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("/orb_pose_measurement",10);
     
     ros::Rate loop_rate(30);
     
     while (ros::ok()) {    
+
         ros::spinOnce();
+
         now = time(NULL);
-        
-        if(now-before>0.2)
+        if(now-before>1.0)//HACK?
         {
-            before = time(NULL);
+            before = now;
             pub.publish(imageGrabber.pointCloud);
         }
         if(imageGrabber.initialized)
         {
             pose_pub.publish(imageGrabber.pose_out_);
         }
+
         loop_rate.sleep();
     }
     
-    
     // Stop all threads
     SLAM.Shutdown();
-    
     // Save camera trajectory
     SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
-    
     ros::shutdown();
     
     return 0;
