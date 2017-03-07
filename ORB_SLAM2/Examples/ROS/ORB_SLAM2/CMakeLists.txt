@@ -67,7 +67,8 @@ ${LIBS}
 )
 
 # Node for monocular camera (Augmented Reality Demo)
-#osbuild_add_executable(MonoAR
+
+#rosbuild_add_executable(MonoAR
 #src/AR/ros_mono_ar.cc
 #src/AR/ViewerAR.h
 #src/AR/ViewerAR.cc
