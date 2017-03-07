@@ -1,5 +1,3 @@
-// modified to include  #include <unistd.h> from J. Londschien
-
 /**
 * This file is part of ORB-SLAM2.
 *
@@ -26,7 +24,6 @@
 #include "Optimizer.h"
 
 #include<mutex>
-#include <unistd.h>
 
 namespace ORB_SLAM2
 {

@@ -1,5 +1,3 @@
-// modified to include  #include <unistd.h> from J. Londschien
-
 /**
 * This file is part of ORB-SLAM2.
 *
@@ -32,7 +30,6 @@
 
 #include<mutex>
 #include<thread>
-#include <unistd.h>
 
 
 namespace ORB_SLAM2
