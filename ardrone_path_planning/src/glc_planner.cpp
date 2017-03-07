@@ -24,7 +24,7 @@ public:
 
 
 //Wrapper around the glc algorithm for real-time functionality
-class real_time_motion_planner
+class RealTimeMotionPlanner
 {
     glc::Parameters parameters;
     glc::DynamicalSystem* dynamic_model;
@@ -43,7 +43,7 @@ public:
     geometry_msgs::Point p;
     
 
-    real_time_motion_planner():current_state({0.0,0.0})
+    RealTimeMotionPlanner():current_state({0.0,0.0})
     {
         parameters.res=8;
         parameters.control_dim = 2;
@@ -130,15 +130,16 @@ public:
 
 int main(int argc, char **argv) 
 {
-    real_time_motion_planner rtmp;
+    RealTimeMotionPlanner rtmp;
     
     ros::init(argc, argv, "motion_planner");
     ros::NodeHandle nh;
-    ros::Subscriber pose_sub = nh.subscribe<geometry_msgs::Pose>( "quad_pose", 10,  &real_time_motion_planner::update_pose, &rtmp);
+    ros::Subscriber pose_sub = nh.subscribe<geometry_msgs::Pose>( "quad_pose", 10,  &RealTimeMotionPlanner::update_pose, &rtmp);
     ros::Publisher planner_pub = nh.advertise<visualization_msgs::Marker>("reference_trajectory", 2);
     
     
     ros::Rate loop_rate(2);
+
     
     //TODO publish trajectory, subscribe to environment, publish controls as well
     while (ros::ok()) {
