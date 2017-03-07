@@ -12,7 +12,10 @@ namespace kdtree{
     //Usual dot product on R*n
     numT innerProduct(const point& x, const point& y)
     {
-        assert(x.size()==y.size() && "dimension mismatch in kdtree");
+//         assert(x.size()==y.size() && "dimension mismatch in kdtree");
+           
+//         std::cout << "dot: " << x[0]*y[0]+x[1]*y[1]+x[2]*y[2] << std::endl;
+//         std::cout << "innerProduct: " << (x*y).sum() << std::endl;
         
         return (x*y).sum();
     }

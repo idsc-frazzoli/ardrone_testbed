@@ -233,15 +233,15 @@ int main(int argc, char **argv)
 
         ros::spinOnce();
 
+        if(imageGrabber.initialized)
+        {
+            pose_pub.publish(imageGrabber.pose_out_);
+        }
         now = time(NULL);
         if(now-before>1.0)//HACK?
         {
             before = now;
             pub.publish(imageGrabber.pointCloud);
-        }
-        if(imageGrabber.initialized)
-        {
-            pose_pub.publish(imageGrabber.pose_out_);
         }
 
         loop_rate.sleep();

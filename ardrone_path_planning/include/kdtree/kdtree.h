@@ -57,10 +57,6 @@ namespace kdtree{
             return !parent.get();
         }
         
-//         std::string toString(){
-//             return utils::toString(coord);
-//         }
-        
         //needed for std::map
         bool operator<(const Vertex& b) const{
             return std::lexicographical_compare(std::begin(coord),std::end(coord),std::begin(b.coord),std::end(b.coord));
@@ -87,7 +83,7 @@ namespace kdtree{
         }
         // Comparison
         bool operator<(const query_node& b) const{
-            return  b.score > score;
+            return  b.score > score;//Other way?
         }
     };
     
@@ -142,6 +138,7 @@ namespace kdtree{
     struct query_results {
         point querypoint;
         query_queue<vertexPtr,numT> BPQ;
+        int depth;
     };
     //~~~~~~~~~~~~~~~~~~~~~~~queue for nn query~~~~~~~~~~~~~~~~~~~~~~~//
     
@@ -151,6 +148,7 @@ namespace kdtree{
         
         bool inPositiveHalfspace(const point& center, const point &pivot, const point& n) const{
             
+//             std::cout << "Diff size " << (center-pivot).size() << std::endl;
             return innerProduct(center-pivot, n)>0;
         }
         
@@ -159,11 +157,13 @@ namespace kdtree{
             d_count++;
             
             bool check_sibling = fabs(innerProduct(center-pivot, n))<=radius;
+            
             return fabs( innerProduct(center-pivot, n) )<=radius;
         }
         
         void addChild(vertexPtr parent, vertexPtr child, bool which){
             parent->children[which] = child;
+//             std::cout << " Added child " << which << std::endl;
             child->parent = parent;
             child->depth = parent->depth+1;
         }
@@ -207,25 +207,19 @@ namespace kdtree{
         
         bool isEmpty()
         {
-            std::cout << "Here-1" << std::endl;
-                
             if (!root.get())
             {
-                std::cout << "Here-4" << std::endl;
-                
                 return true;
             }
-            std::cout << "Here-3" << std::endl;
             return false;
-            
         }
         
         
         void insert(vertexPtr& v){
-            if(!root.get())
+            if(!root.get())//If there is no root
             {
                 assert(v->coord.size()==dimension && "ERROR(kdtree-222): Dimension Mismatch in Kdtree");
-                point node_normal(dimension,0.0);//TODO template on numT as well
+                point node_normal(0.0,dimension);//TODO template on numT as well
                 node_normal[0]=1.0;
                 v->normal=node_normal;
                 root = v; 
@@ -238,8 +232,9 @@ namespace kdtree{
                 //descend the kdtree to find the leaf to be the parent
                 descend(v->coord, parent, side);
                 //Select the normal direction to assign based on parent
-                point node_normal(dimension,0.0);
+                point node_normal(0.0,dimension);
                 node_normal[(parent->depth+1)%dimension]=1.0;
+//                 std::cout << "Normal of parent (" << node_normal[0] << "," << node_normal[1] << "," << node_normal[2] << ")" << std::endl;
                 v->normal=node_normal;
                 
                 //make parent the parent in v and v the child of parent according to side
@@ -255,16 +250,15 @@ namespace kdtree{
             //In case tree is empty
             if(!root.get()){return R;}
             
+            R.depth=0;
             R.querypoint = qp;
             R.BPQ.clear();
             R.BPQ.set_size(k);
             query(qp, root, R);      
-            std::cout << " Query evaluated " << nodes_visited << " nodes" << std::endl;
             return R;
         }
         
         void query(const point& qp, vertexPtr& current, query_results<vertexPtr,numT>& R){ 
-            nodes_visited=1;
             //can't query an empty tree
             if(not root.get())
                 return;
@@ -275,13 +269,13 @@ namespace kdtree{
             //Descend recursively
             if(current->children[side].get())
             {
+                R.depth++;
                 query(qp, current->children[side], R);
             }
                 
             //Pass recursive function once leaf is reached
             //Get distance to leaf node in cubicle
             numT point_score = norm2(qp-current->coord);
-            nodes_visited++;
             R.BPQ.insert(point_score, current);
             
             //Check if nearest ball intersects leaf hyperplane
