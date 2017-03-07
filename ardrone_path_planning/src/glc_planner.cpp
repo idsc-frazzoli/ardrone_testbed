@@ -81,6 +81,7 @@ public:
         traj_marker.color.b = 1.0;
     }
     
+    //Pose msg callback
     void update_pose(geometry_msgs::Pose pose_msg)
     {
         current_state[0]=pose_msg.position.x;
@@ -136,7 +137,6 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
     ros::Subscriber pose_sub = nh.subscribe<geometry_msgs::Pose>( "quad_pose", 10,  &RealTimeMotionPlanner::update_pose, &rtmp);
     ros::Publisher planner_pub = nh.advertise<visualization_msgs::Marker>("reference_trajectory", 2);
-    
     
     ros::Rate loop_rate(2);
 

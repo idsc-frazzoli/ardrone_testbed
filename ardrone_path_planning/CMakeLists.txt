@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
              roscpp 
              std_msgs 
              geometry_msgs 
+             sensor_msgs
              tf
              )
 
@@ -19,6 +20,7 @@ include_directories(
     ${catkin_INCLUDE_DIRS} 
     include 
     include/glc_lib
+    include/kdtree
     )
 
 # 3) Tell catkin the include dirs between packages
@@ -29,6 +31,8 @@ catkin_package(
   
 # 4) Add the package executables
 add_executable(motion_planner_node src/glc_planner.cpp)
+add_executable(collision_detection_node src/collision_detection.cpp)
 
 # 5) Link the code
+target_link_libraries(collision_detection_node ${catkin_LIBRARIES})
 target_link_libraries(motion_planner_node ${catkin_LIBRARIES})

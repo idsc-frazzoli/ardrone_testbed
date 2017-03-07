@@ -31,6 +31,12 @@ namespace glc{
             time.resize(n);
         }
         
+        void reserve(int n)
+        {
+            states.reserve(n);
+            time.reserve(n);
+        }
+        
         void push(const Trajectory& tail)
         {
             //states.reserve(states.size()+tail.states.size());
@@ -69,6 +75,12 @@ namespace glc{
         void set(int index, const vctr& x, double t) {
             states[index]=x;
             time[index]=t;
+        }
+        
+        void push_back(const vctr& x, double t)
+        {
+            states.push_back(x);
+            time.push_back(t);
         }
         const double& getTime(int index) const
         {

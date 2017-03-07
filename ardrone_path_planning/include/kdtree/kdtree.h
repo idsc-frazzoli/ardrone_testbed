@@ -1,5 +1,7 @@
-#ifndef _KDTREE_H_
-#define _KDTREE_H_
+//This is an adaptation of a kdtree implementation written by Valerio Varricchio
+
+#ifndef KDTREE_H_
+#define KDTREE_H_
 
 #include <memory>
 #include <utility>
@@ -9,48 +11,40 @@
 #include <set>
 #include <queue>
 #include <ostream>
-
-
-#include "../utils/utils.h"
+#include "kdtree_utils.h"
 
 namespace kdtree{
     
-    typedef utils::numT numT;
-    typedef utils::vctr vctr;
-    typedef utils::path path;  
-    
-    
-    
-    //~~~~~~~~~~~~~~~~~~~vertex class~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-    class vertex
+    //~~~~~~~~~~~~~~~~~~~Vertex class~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+    class Vertex
     {
     public:
         
-        vctr coord;
-        vctr normal;
+        point coord;
+        point normal;
         
         size_t depth;
         size_t id;
         
         // Tree pointers
-        std::shared_ptr<vertex> parent;
-        std::shared_ptr<vertex> children[2];
+        std::shared_ptr<Vertex> parent;
+        std::shared_ptr<Vertex> children[2];
         
-        vertex(const vctr& _coord)
+        Vertex(const point& _coord)//TODO does normal get assigned to something meaningful?
         {
             coord=_coord;
             normal.resize(coord.size());
             return;
         }
         
-        vertex(const vctr& _coord, const vctr& _normal)
+        Vertex(const point& _coord, const point& _normal)
         {
             coord=_coord;
             normal=_normal;
             return;
         }
         
-        ~vertex(){ // HACK!!
+        ~Vertex(){ // HACK!!
 //             std::cout << "Deleting node with coords " << utils::toString(coord) << std::endl;
         }
         
@@ -63,17 +57,17 @@ namespace kdtree{
             return !parent.get();
         }
         
-        std::string toString(){
-            return utils::toString(coord);
-        }
+//         std::string toString(){
+//             return utils::toString(coord);
+//         }
         
         //needed for std::map
-        bool operator<(const vertex& b) const{
-            return std::lexicographical_compare(coord.begin(),coord.end(),b.coord.begin(),b.coord.end());
+        bool operator<(const Vertex& b) const{
+            return std::lexicographical_compare(std::begin(coord),std::end(coord),std::begin(b.coord),std::end(b.coord));
         }
     };
-    typedef std::shared_ptr<vertex> vertexPtr;
-    //~~~~~~~~~~~~~~~~~~~vertex class~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+    typedef std::shared_ptr<Vertex> vertexPtr;
+    //~~~~~~~~~~~~~~~~~~~Vertex class~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     
     
     
@@ -146,7 +140,7 @@ namespace kdtree{
     
     template <class vertexPtr, class numT>
     struct query_results {
-        vctr querypoint;
+        point querypoint;
         query_queue<vertexPtr,numT> BPQ;
     };
     //~~~~~~~~~~~~~~~~~~~~~~~queue for nn query~~~~~~~~~~~~~~~~~~~~~~~//
@@ -155,17 +149,17 @@ namespace kdtree{
     //~~~~~~~~~~~~~~~~~kD-tree class(insertion and nn query)~~~~~~~~~~//
     class Kdtree{
         
-        bool inPositiveHalfspace(const vctr& center, const vctr &pivot, const vctr& n) const{
+        bool inPositiveHalfspace(const point& center, const point &pivot, const point& n) const{
             
-            return utils::dot_product(utils::vec_diff(center, pivot), n)>0;
+            return innerProduct(center-pivot, n)>0;
         }
         
-        bool ballHyperplane(const vctr& center, const numT& radius, const vctr& pivot, const vctr& n)
+        bool ballHyperplane(const point& center, const numT& radius, const point& pivot, const point& n)
         {
             d_count++;
             
-            bool check_sibling = fabs(utils::dot_product(utils::vec_diff(center, pivot), n))<=radius;
-            return fabs(utils::dot_product(utils::vec_diff(center, pivot), n))<=radius;
+            bool check_sibling = fabs(innerProduct(center-pivot, n))<=radius;
+            return fabs( innerProduct(center-pivot, n) )<=radius;
         }
         
         void addChild(vertexPtr parent, vertexPtr child, bool which){
@@ -175,12 +169,12 @@ namespace kdtree{
         }
         
         //First call in recursive function
-        void descend(vctr& coord, vertexPtr& parent_o, bool& side_o) const {
+        void descend(point& coord, vertexPtr& parent_o, bool& side_o) const {
             descend(coord, root, parent_o, side_o);
         }
 
         //Recursive function to descend binary tree
-        void descend(vctr& x, const vertexPtr& node, vertexPtr& parent_o, bool& side_o) const {
+        void descend(point& x, const vertexPtr& node, vertexPtr& parent_o, bool& side_o) const {
             bool which = inPositiveHalfspace(x, node->coord, node->normal);
             if(!node->children[which].get()){
                 parent_o = node;
@@ -190,32 +184,48 @@ namespace kdtree{
             descend(x, node->children[which], parent_o, side_o);
         }
         
-        
-    public:
-        vertexPtr root;//TODO change to template vertex object
+        vertexPtr root;//TODO change to template Vertex object
         int dimension;
+        long int nodes_visited;
         unsigned int d_count;
+    public:
 
         Kdtree()
         {
             d_count=0;
+            nodes_visited=0;
             return;
         }
         
         Kdtree(const int& _dimension)
         {
             d_count=0;
+            nodes_visited=0;
             dimension=_dimension;
             return;
         }
         
-
+        bool isEmpty()
+        {
+            std::cout << "Here-1" << std::endl;
+                
+            if (!root.get())
+            {
+                std::cout << "Here-4" << std::endl;
+                
+                return true;
+            }
+            std::cout << "Here-3" << std::endl;
+            return false;
+            
+        }
+        
         
         void insert(vertexPtr& v){
             if(!root.get())
             {
-                assert(v->coord.size()==dimension);
-                vctr node_normal(dimension,0.0);//TODO template on numT as well
+                assert(v->coord.size()==dimension && "ERROR(kdtree-222): Dimension Mismatch in Kdtree");
+                point node_normal(dimension,0.0);//TODO template on numT as well
                 node_normal[0]=1.0;
                 v->normal=node_normal;
                 root = v; 
@@ -228,9 +238,8 @@ namespace kdtree{
                 //descend the kdtree to find the leaf to be the parent
                 descend(v->coord, parent, side);
                 //Select the normal direction to assign based on parent
-                vctr node_normal(dimension,0.0);
+                point node_normal(dimension,0.0);
                 node_normal[(parent->depth+1)%dimension]=1.0;
-//                 printf("normal: (%f,%f)\n",node_normal[0],node_normal[1]);
                 v->normal=node_normal;
                 
                 //make parent the parent in v and v the child of parent according to side
@@ -240,22 +249,26 @@ namespace kdtree{
         }
         
             
-            query_results<vertexPtr,numT> query(const vctr& qp, size_t k){
+            query_results<vertexPtr,numT> query(const point& qp, size_t k){
             query_results<vertexPtr,numT> R;
-            //Can't query empty tree
-//             printf("--------------New query--------\n");
             
+            //In case tree is empty
             if(!root.get()){return R;}
             
             R.querypoint = qp;
             R.BPQ.clear();
             R.BPQ.set_size(k);
             query(qp, root, R);      
-            
+            std::cout << " Query evaluated " << nodes_visited << " nodes" << std::endl;
             return R;
         }
         
-        void query(const vctr& qp, vertexPtr& current, query_results<vertexPtr,numT>& R){ 
+        void query(const point& qp, vertexPtr& current, query_results<vertexPtr,numT>& R){ 
+            nodes_visited=1;
+            //can't query an empty tree
+            if(not root.get())
+                return;
+                
             //Determine which side of the current nodes hyperplane the qp is on
             bool side = inPositiveHalfspace(qp, current->coord, current->normal);
             
@@ -267,14 +280,17 @@ namespace kdtree{
                 
             //Pass recursive function once leaf is reached
             //Get distance to leaf node in cubicle
-            numT point_score = utils::norm(utils::vec_diff(qp, current->coord));
+            numT point_score = norm2(qp-current->coord);
+            nodes_visited++;
             R.BPQ.insert(point_score, current);
             
             //Check if nearest ball intersects leaf hyperplane
             if(ballHyperplane(qp, R.BPQ.get_score(), current->coord, current->normal)/* or R.BPQ.queue.size()<R.BPQ.query_size*/)
             {
                 if(current->children[1-side].get())
+                {
                     query(qp, current->children[1-side], R);
+                }
             }
         }
     };

@@ -109,17 +109,18 @@ namespace glc{
             double num_steps=ceil((tf-t0)/max_time_step);
             double dt=(tf-t0)/num_steps;
             //resize solution
-            sol.resize(num_steps+1);
-            
+//             sol.resize(num_steps+1);
+            sol.reserve(num_steps+1);
             //set initial condition
             //sol.setState(x0);
-            sol.set(0, x0, t0);
+//             sol.set(0, x0, t0);
+            sol.push_back(x0,t0);
             vctr x1;
             //integrate
             for(int i=0;i<num_steps;i++)
             {
                 step(x1,sol.getState(i),u,dt);
-                sol.set(i+1, x1, sol.getTime(i)+dt);
+                sol.push_back(x1, sol.getTime(i)+dt);
                 //sol.time.at(i+1)=sol.time.at(i)+dt;
             }
             sim_counter++;
