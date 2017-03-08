@@ -21,6 +21,8 @@ public:
   tf2::Vector3 orb_displacement, last_orb_meas;
   tf2::Vector3 imu_displacement, curr_imu_vel, last_imu_meas;
   tf2::Quaternion orb_orientation;
+  
+  string imu_frame_id, orb_frame_id;
  
   void imu_callback(sensor_msgs::Imu msg)
   {
@@ -39,6 +41,8 @@ public:
 				             tf2Scalar(msg.linear_acceleration.y), 
 					     tf2Scalar(msg.linear_acceleration.z));
     
+    imu_frame_id = msg.header.frame_id;
+    
     tf2::Transform tf = tf2::Transform(tf2::Quaternion(msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w));
     
     // derotate acceleration
@@ -52,8 +56,8 @@ public:
   void orb_callback(geometry_msgs::PoseWithCovarianceStamped msg)
   {
     tf2::Vector3 curr_orb_meas = tf2::Vector3(tf2Scalar(msg.pose.pose.position.x), 
-				            tf2Scalar(msg.pose.pose.position.y), 
-				            tf2Scalar(msg.pose.pose.position.z));
+				              tf2Scalar(msg.pose.pose.position.y), 
+				              tf2Scalar(msg.pose.pose.position.z));
     
     orb_displacement = curr_orb_meas - last_orb_meas;
     last_orb_meas = curr_orb_meas;
@@ -62,17 +66,23 @@ public:
     orb_orientation.setX(msg.pose.pose.orientation.x);
     orb_orientation.setY(msg.pose.pose.orientation.y);
     orb_orientation.setZ(msg.pose.pose.orientation.z);
+    
+    orb_frame_id = msg.header.frame_id;
   }
   
-  geometry_msgs::PoseWithCovariance get_scaled_pose()
+  geometry_msgs::PoseWithCovarianceStamped get_scaled_pose()
   { 
-    geometry_msgs::PoseWithCovariance pose_out;
+    geometry_msgs::PoseWithCovarianceStamped pose_out;
     
-    pose_out.pose.position.x = last_orb_meas.x() / scale;
-    pose_out.pose.position.y = last_orb_meas.y() / scale;
-    pose_out.pose.position.z = last_orb_meas.z() / scale;
+    pose_out.pose.pose.position.x = last_orb_meas.x() / scale;
+    pose_out.pose.pose.position.y = last_orb_meas.y() / scale;
+    pose_out.pose.pose.position.z = last_orb_meas.z() / scale;
     
-    pose_out.pose.orientation = tf2::toMsg(orb_orientation);
+    pose_out.pose.pose.orientation = tf2::toMsg(orb_orientation);
+    
+    pose_out.header.frame_id = orb_frame_id;
+    
+    pose_out.header.stamp = ros::Time::now();
     
     return pose_out;
   }
@@ -124,9 +134,9 @@ int main(int argc, char **argv)
 	// TODO: debug
 	std_msgs::Float32 scale = scale_est.get_scale();
 	cout << "Scale: " << scale << endl;
-	cout << "Filtered Pose: " << scaled_orb_pose.pose.position.x << " "
-	                          << scaled_orb_pose.pose.position.y << " "
-				  << scaled_orb_pose.pose.position.z << endl; 
+	cout << "Filtered Pose: " << scaled_orb_pose.pose.pose.position.x << " "
+	                          << scaled_orb_pose.pose.pose.position.y << " "
+				  << scaled_orb_pose.pose.pose.position.z << endl; 
 	
 	filt_orb_pub.publish(scaled_orb_pose);
 	orb_scale_pub.publish(scale);
