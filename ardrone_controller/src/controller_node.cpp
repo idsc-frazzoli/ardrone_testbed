@@ -143,11 +143,6 @@ public:
       
       for (int it=0; it<N ; it++)
       {
-	     // TODO remove after testing
-     std::cout << curr_acc.x() << "\t" << curr_mag.x() << std::endl;
-     std::cout << curr_acc.y() << "\t" << curr_mag.y() << std::endl;
-     std::cout << curr_acc.z() << "\t" << curr_mag.z() << std::endl;
-	
 	// wait for imu data to be received
 	ros::spinOnce();
 	// add to average
@@ -161,11 +156,6 @@ public:
      // create z axis through cross product
      tf::Vector3 y_axis = avg_acc.cross(avg_mag);
      
-     // TODO remove after testing
-     std::cout << avg_acc.x() << "\t" << y_axis.x() << "\t" << avg_mag.x() << std::endl;
-     std::cout << avg_acc.y() << "\t" << y_axis.y() << "\t" << avg_mag.y() << std::endl;
-     std::cout << avg_acc.z() << "\t" << y_axis.z() << "\t" << avg_mag.z() << std::endl;
-     
      // create a transform tf::Transform from x,y,z axes
      tf::Matrix3x3 m = tf::Matrix3x3(avg_acc.x(), y_axis.x(), avg_mag.x(), 
 				     avg_acc.y(), y_axis.y(), avg_mag.y(), 
@@ -177,7 +167,6 @@ public:
     
     void mag_callback(geometry_msgs::Vector3Stamped msg)
     {
-      std::cout << "mag callback"<< std::endl;
       curr_mag = tf::Vector3(tfScalar(msg.vector.x), 
 			     tfScalar(msg.vector.y), 
 			     tfScalar(msg.vector.z));
@@ -206,8 +195,6 @@ int main(int argc, char **argv)
     // calibrate imu to align average down direction with positive z
     int N_samples = 100;
     od_IMU.calibrate(100, 0.01);
-    
-    std::cout << od_IMU.calib_tf.getRotation().getAngle() << std::endl;
     
     while (ros::ok())
     {    
