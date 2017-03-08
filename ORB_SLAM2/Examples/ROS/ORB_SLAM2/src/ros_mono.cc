@@ -111,74 +111,82 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         
         first_keyframe_to_ardrone_base_frontcam_transform.setOrigin(transform_matrix.transpose() * origin * -1);
         first_keyframe_to_ardrone_base_frontcam_transform.setRotation(transform_quat.inverse());
-        
-        // broadcast all transforms
-        ros::Time t = ros::Time::now();
-        //br.sendTransform(tf::StampedTransform(world_to_level_transform.inverse(), t, "/level", "/world"));// world = odom at time 0, level = base_link at time 0 (when orb finds keyframe)
-        br.sendTransform(tf::StampedTransform(world_to_first_keyframe_transform.inverse(), t, "/first_keyframe", "/world"));
-        br.sendTransform(tf::StampedTransform(first_keyframe_to_ardrone_base_frontcam_transform.inverse(), t, "/ardrone_base_frontcam", "/first_keyframe"));
-        
-        // plot pose odom to world
-        tf::Transform pose_out_tf_non_stamped;
-        tf::StampedTransform ardrone_base_frontcam_to_ardrone_base_link;
-        
-        tf_listener.lookupTransform("/ardrone_base_frontcam", "/ardrone_base_link", ros::Time(0), ardrone_base_frontcam_to_ardrone_base_link); // orientation of odom wrt world
-        
-        pose_out_tf_non_stamped = first_keyframe_to_ardrone_base_frontcam_transform;// * ardrone_base_frontcam_to_ardrone_base_link;
-        tf::StampedTransform pose_out_tf = tf::StampedTransform(pose_out_tf_non_stamped, t, "/world", "/ardrone_base_link");
-        
-        //  tf::TransformListener listener1;
-        
-        //  listener1.lookupTransform("/world", "/ardrone_base_link", ros::Time(0), pose_out_tf); // orientation of odom wrt world
-        pose_out_.header.frame_id = "/first_keyframe";
-        pose_out_.header.stamp = t;
-        
-        tf::Quaternion pose_orientation = pose_out_tf.getRotation();
-        tf::Vector3 pose_origin = pose_out_tf.getOrigin();
-        pose_out_.pose.pose.orientation.x = pose_orientation.getX(); 
-        pose_out_.pose.pose.orientation.y = pose_orientation.getY();
-        pose_out_.pose.pose.orientation.z = pose_orientation.getZ();
-        pose_out_.pose.pose.orientation.w = pose_orientation.getW();
-        pose_out_.pose.pose.position.x = pose_origin.getX();
-        pose_out_.pose.pose.position.y = pose_origin.getY();
-        pose_out_.pose.pose.position.z = pose_origin.getZ();
-        
-        
-        //tf::StampedTransform transform_out = tf::StampedTransform(transform, t, "/level", "/camera");
-        
-        //br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/camera"));
-        
-        // rotate camera pose into world frame
-        
-        
-        // define helper quaternions
-        //  tf::Quaternion origin_transform = tf::Quaternion(-0.5, 0.5, -0.5, 0.5);
-        //  tf::Quaternion other_transform = tf::Quaternion(0.5, -0.5, 0.5, 0.5);
-        //  tf::Quaternion rotation_transform = tf::Quaternion(0, -sqrt(2)/2, 0, sqrt(2)/2);
-        //  
-        //  rotation_transform = other_transform.inverse() * transform_quat.inverse() * rotation_transform;
-        //  
-        //  tf::Vector3 origin_i_rotated = tf::quatRotate(origin_transform, transform_matrix.transpose() * origin * -1);
-        //  
-        //  pose_out_.pose.pose.orientation.x = rotation_transform.getX();
-        //  pose_out_.pose.pose.orientation.y = rotation_transform.getY();
-        //  pose_out_.pose.pose.orientation.z = rotation_transform.getZ();
-        //  pose_out_.pose.pose.orientation.w = rotation_transform.getW();
-        //  pose_out_.pose.pose.position.x = origin_i_rotated.getX();
-        //  pose_out_.pose.pose.position.y = origin_i_rotated.getY();
-        //  pose_out_.pose.pose.position.z = origin_i_rotated.getZ();
-        //  
-        //TODO: Set covariance
-        for(auto& x:pose_out_.pose.covariance)
-            x = 0.0;
-        
-        //  pose_out.pose.covariance. = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        //                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        //                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        //                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        //                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        //                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        //              //    pose_out.pose.cova
+	 
+	// broadcast all transforms
+	ros::Time t = ros::Time::now();
+	//br.sendTransform(tf::StampedTransform(world_to_level_transform.inverse(), t, "/level", "/world"));// world = odom at time 0, level = base_link at time 0 (when orb finds keyframe)
+	br.sendTransform(tf::StampedTransform(world_to_first_keyframe_transform.inverse(), t, "/first_keyframe", "/world"));
+	br.sendTransform(tf::StampedTransform(first_keyframe_to_ardrone_base_frontcam_transform.inverse(), t, "/ardrone_base_frontcam", "/first_keyframe"));
+	
+	// plot pose odom to world
+	tf::Transform pose_out_tf_non_stamped;
+	tf::StampedTransform ardrone_base_frontcam_to_ardrone_base_link;
+	
+	tf_listener.lookupTransform("/ardrone_base_frontcam", "/ardrone_base_link", ros::Time(0), ardrone_base_frontcam_to_ardrone_base_link); // orientation of odom wrt world
+	
+	pose_out_tf_non_stamped = first_keyframe_to_ardrone_base_frontcam_transform;// * ardrone_base_frontcam_to_ardrone_base_link;
+	tf::StampedTransform pose_out_tf = tf::StampedTransform(pose_out_tf_non_stamped, t, "/world", "/ardrone_base_link");
+	
+	// 	tf::TransformListener listener1;
+
+// 	listener1.lookupTransform("/world", "/ardrone_base_link", ros::Time(0), pose_out_tf); // orientation of odom wrt world
+	pose_out_.header.frame_id = "/first_keyframe";
+	pose_out_.header.stamp = t;
+	
+	tf::Quaternion pose_orientation = pose_out_tf.getRotation();
+	tf::Vector3 pose_origin = pose_out_tf.getOrigin();
+	pose_out_.pose.pose.orientation.x = pose_orientation.getX(); 
+	pose_out_.pose.pose.orientation.y = pose_orientation.getY();
+	pose_out_.pose.pose.orientation.z = pose_orientation.getZ();
+	pose_out_.pose.pose.orientation.w = pose_orientation.getW();
+	pose_out_.pose.pose.position.x = pose_origin.getX();
+	pose_out_.pose.pose.position.y = pose_origin.getY();
+	pose_out_.pose.pose.position.z = pose_origin.getZ();
+	
+	
+	//tf::StampedTransform transform_out = tf::StampedTransform(transform, t, "/level", "/camera");
+	
+	//br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/level", "/camera"));
+	
+	// rotate camera pose into world frame
+	
+	
+	// define helper quaternions
+// 	tf::Quaternion origin_transform = tf::Quaternion(-0.5, 0.5, -0.5, 0.5);
+// 	tf::Quaternion other_transform = tf::Quaternion(0.5, -0.5, 0.5, 0.5);
+// 	tf::Quaternion rotation_transform = tf::Quaternion(0, -sqrt(2)/2, 0, sqrt(2)/2);
+// 	
+// 	rotation_transform = other_transform.inverse() * transform_quat.inverse() * rotation_transform;
+// 	
+// 	tf::Vector3 origin_i_rotated = tf::quatRotate(origin_transform, transform_matrix.transpose() * origin * -1);
+// 	
+// 	pose_out_.pose.pose.orientation.x = rotation_transform.getX();
+// 	pose_out_.pose.pose.orientation.y = rotation_transform.getY();
+// 	pose_out_.pose.pose.orientation.z = rotation_transform.getZ();
+// 	pose_out_.pose.pose.orientation.w = rotation_transform.getW();
+// 	pose_out_.pose.pose.position.x = origin_i_rotated.getX();
+// 	pose_out_.pose.pose.position.y = origin_i_rotated.getY();
+// 	pose_out_.pose.pose.position.z = origin_i_rotated.getZ();
+// 	
+	//TODO: Set covariance
+	for(auto& x:pose_out_.pose.covariance)
+	  x = 0.0;
+	
+	pose_out_.pose.covariance[0] = 1;
+	pose_out_.pose.covariance[7] = 1;
+	pose_out_.pose.covariance[14] = 1;
+	pose_out_.pose.covariance[21] = 1;
+	pose_out_.pose.covariance[28] = 1;
+	pose_out_.pose.covariance[35] = 1;
+	
+// 	pose_out.pose.covariance. = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+// 				    0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+// 				//    pose_out.pose.cova
+
     }
     
     // gets points from most recent frame
