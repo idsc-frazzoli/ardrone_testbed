@@ -106,12 +106,12 @@ int main ( int argc, char **argv )
             try
 
             {
-                cout << "a" << endl;
                 tf::StampedTransform T_1, T_2;
+		tfListener.waitForTransform("/odom", "/ardrone_base_frontcam", ros::Time::now(), ros::Duration(3.0));
                 tfListener.lookupTransform ( "/odom", "/ardrone_base_frontcam", ros::Time ( 0 ), T_1 );
-                cout << "b" << endl;
+		tfListener.waitForTransform("/ardrone_base_frontcam", "/ardrone_base_link", ros::Time::now(), ros::Duration(3.0));
                 tfListener.lookupTransform ( "/ardrone_base_frontcam", "/ardrone_base_link", ros::Time ( 0 ), T_2 );
-		cout << T_2.getRotation().getW() << endl;
+		
                 igb.world_to_orb_odom.setOrigin ( tf2::Vector3 ( T_1.getOrigin().getX(), T_1.getOrigin().getY(),T_1.getOrigin().getZ() ) );
                 igb.frontcam_to_base_link.setOrigin ( tf2::Vector3 ( T_2.getOrigin().getX(), T_2.getOrigin().getY(),T_2.getOrigin().getZ() ) );
                 igb.world_to_orb_odom.setRotation ( tf2::Quaternion ( T_1.getRotation().getX(), T_1.getRotation().getY(), T_1.getRotation().getZ(), T_1.getRotation().getZ() ) );
@@ -126,7 +126,7 @@ int main ( int argc, char **argv )
 
         }
         ros::spinOnce();
-
+	
         br.sendTransform ( igb.T_wo );
         br.sendTransform ( igb.T_of );
         br.sendTransform ( igb.T_fb );
@@ -182,6 +182,8 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         T_fb = toTFStamped ( frontcam_to_base_link, ros::Time::now(), "/orb/frontcam", "/orb/base_link" );
 
         // get pose of base_link in world frame
+	world_to_orb_odom.setOrigin(tf2::Vector3(0,0,0));
+	frontcam_to_base_link.setOrigin(tf2::Vector3(0,0,0));
         tf2::Transform T_wb = world_to_orb_odom * orb_odom_to_frontcam * frontcam_to_base_link;
 
         // set pose
