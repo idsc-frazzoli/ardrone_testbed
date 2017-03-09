@@ -59,7 +59,7 @@ public:
     tf::Quaternion tfqt_adj;
     
     //tf::StampedTransform world_to_level_transform;
-    tf::StampedTransform world_to_first_keyframe_transform;
+    tf::StampedTransform first_keyframe_to_odom_transform;
     tf::StampedTransform first_keyframe_to_ardrone_base_frontcam_transform;
     tf::TransformListener tf_listener;
 };
@@ -132,8 +132,8 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	  
 	// listen to transform odom baselink for trafo from world to first_keyframe
 	//tf_listener.lookupTransform("/odom", "/ardrone_base_link", ros::Time(0), world_to_level_transform); // orientation of drone wrt north & down
-	tf_listener.lookupTransform("/ardrone_base_link", "/ardrone_base_frontcam", ros::Time(0), world_to_first_keyframe_transform); // orientation of camera wrt drone
-	world_to_first_keyframe_transform.setOrigin(tf::Vector3(0, 0, 0));
+	tf_listener.lookupTransform("odom", "/ardrone_base_frontcam", ros::Time(0), first_keyframe_to_odom_transform); // orientation of camera wrt drone
+	first_keyframe_to_odom_transform.setOrigin(tf::Vector3(0, 0, 0));
 
 	initialized = true;
     }//ardrone_base_frontcam
@@ -157,8 +157,8 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	// broadcast all transforms
 	ros::Time t = ros::Time::now();
 	//br.sendTransform(tf::StampedTransform(world_to_level_transform.inverse(), t, "/level", "/world"));// world = odom at time 0, level = base_link at time 0 (when orb finds keyframe)
-	br.sendTransform(tf::StampedTransform(world_to_first_keyframe_transform.inverse(), t, "/first_keyframe", "/world"));
-	br.sendTransform(tf::StampedTransform(first_keyframe_to_ardrone_base_frontcam_transform.inverse(), t, "/ardrone_base_frontcam", "/first_keyframe"));
+	br.sendTransform(tf::StampedTransform(first_keyframe_to_odom_transform, t, "odom", "/first_keyframe"));
+	//br.sendTransform(tf::StampedTransform(first_keyframe_to_ardrone_base_frontcam_transform.inverse(), t, "/ardrone_base_frontcam", "/first_keyframe"));
 	
 	// plot pose odom to world
 	tf::Transform pose_out_tf_non_stamped;
@@ -167,7 +167,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	tf_listener.lookupTransform("/ardrone_base_frontcam", "/ardrone_base_link", ros::Time(0), ardrone_base_frontcam_to_ardrone_base_link); // orientation of odom wrt world
 	
 	pose_out_tf_non_stamped = first_keyframe_to_ardrone_base_frontcam_transform;// * ardrone_base_frontcam_to_ardrone_base_link;
-	tf::StampedTransform pose_out_tf = tf::StampedTransform(pose_out_tf_non_stamped, t, "/world", "/ardrone_base_link");
+	tf::StampedTransform pose_out_tf = tf::StampedTransform(pose_out_tf_non_stamped, t, "odom", "/orb_pose_tf");
 	
 	// 	tf::TransformListener listener1;
 
