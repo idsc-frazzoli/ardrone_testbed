@@ -8,7 +8,7 @@ Panels:
         - /Status1
         - /TF1
         - /TF1/Frames1
-      Splitter Ratio: 0.5
+      Splitter Ratio: 0.677777767
     Tree Height: 754
   - Class: rviz/Selection
     Name: Selection
@@ -28,7 +28,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: FRONT CAMERA
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -60,15 +60,13 @@ Visualization Manager:
         ardrone_base_frontcam:
           Value: false
         ardrone_base_link:
-          Value: true
-        ekf_base_link:
           Value: false
         first_keyframe:
           Value: false
         odom:
           Value: true
-        world:
-          Value: false
+        orb_pose_unscaled_corrected:
+          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -80,11 +78,10 @@ Visualization Manager:
             ardrone_base_bottomcam:
               {}
             ardrone_base_frontcam:
-              first_keyframe:
-                world:
-                  {}
-          ekf_base_link:
-            {}
+              {}
+          first_keyframe:
+            orb_pose_unscaled_corrected:
+              {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -185,16 +182,16 @@ Visualization Manager:
           Scale: 1
           Value: true
         Value: true
-      Enabled: false
+      Enabled: true
       Head Length: 0.300000012
       Head Radius: 0.100000001
       Name: PoseWithCovariance
       Shaft Length: 1
       Shaft Radius: 0.0500000007
       Shape: Arrow
-      Topic: /orb_pose_measurement
+      Topic: /orb_pose_unscaled
       Unreliable: false
-      Value: false
+      Value: true
     - Alpha: 1
       Axes Length: 1
       Axes Radius: 0.100000001

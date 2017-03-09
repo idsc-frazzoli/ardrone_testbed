@@ -11,8 +11,7 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
-#include <sensor_fusion_comm/DoubleArrayStamped.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
+//#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 class OdometryIMU
 {
@@ -36,10 +35,8 @@ public:
     tf::Quaternion slam_quat;
     tf::Quaternion imu_quat;
     tf::Quaternion quat_cam_drone;
-    tf::TransformBroadcaster br;
+    //tf::TransformBroadcaster br;
     tf::Transform level;
-    geometry_msgs::PoseWithCovarianceStamped ekf_pose_out_;
-    nav_msgs::Odometry ekf_odom_out_;
     
     OdometryIMU():count(0)
     {
@@ -200,10 +197,7 @@ int main(int argc, char **argv)
     {    
         od_IMU.get_slam_tf();
         ros::spinOnce();
-        
-	ekf_pub.publish(od_IMU.ekf_pose_out_);
-	ekf_publisher.publish(od_IMU.ekf_odom_out_);
-	
+      
         loop_rate.sleep();
     }
     
