@@ -39,12 +39,11 @@
 
 #include"../../../include/System.h"
 #include <../../opt/ros/kinetic/include/geometry_msgs/QuaternionStamped.h>
-#include <tf2_ros/transform_listener.h>
+#include <tf/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <tf/transform_datatypes.h>
 #include <tf2/LinearMath/Matrix3x3.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2/convert.h>
 
 using namespace std;
 
@@ -56,6 +55,8 @@ public:
         pose_out_.header.frame_id = "/orb/odom";
     }
     void GrabImage ( const sensor_msgs::ImageConstPtr& msg );
+    geometry_msgs::TransformStamped toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id );
+
 
     ORB_SLAM2::System* mpSLAM;
 
@@ -65,12 +66,15 @@ public:
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
 
     tf2::Transform orb_odom_to_frontcam, world_to_orb_odom, frontcam_to_base_link;
-    tf2_ros::Buffer tf_buffer;
+
+    geometry_msgs::TransformStamped T_wo;
+    geometry_msgs::TransformStamped T_fb;
+    geometry_msgs::TransformStamped T_of;
 };
 
 int main ( int argc, char **argv )
 {
-    ros::init(argc,argv,"Mono");
+    ros::init ( argc,argv,"Mono" );
     ros::start();
 
     if ( argc != 3 ) {
@@ -89,14 +93,44 @@ int main ( int argc, char **argv )
     ros::Publisher point_cloud_pub = nodeHandler.advertise<sensor_msgs::PointCloud> ( "/orb/point_cloud", 2 );
     ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose",2 );
 
+    tf::TransformListener tfListener;
+    tf2_ros::TransformBroadcaster br;
+
     ros::Rate loop_rate ( 30 );
 
     while ( ros::ok() ) {
-        ros::spinOnce();
         point_cloud_pub.publish ( igb.pc );
         if ( igb.initialized ) {
             pose_pub.publish ( igb.pose_out_ );
+        } else {
+            try
+
+            {
+                cout << "a" << endl;
+                tf::StampedTransform T_1, T_2;
+                tfListener.lookupTransform ( "/odom", "/ardrone_base_frontcam", ros::Time ( 0 ), T_1 );
+                cout << "b" << endl;
+                tfListener.lookupTransform ( "/ardrone_base_frontcam", "/ardrone_base_link", ros::Time ( 0 ), T_2 );
+		cout << T_2.getRotation().getW() << endl;
+                igb.world_to_orb_odom.setOrigin ( tf2::Vector3 ( T_1.getOrigin().getX(), T_1.getOrigin().getY(),T_1.getOrigin().getZ() ) );
+                igb.frontcam_to_base_link.setOrigin ( tf2::Vector3 ( T_2.getOrigin().getX(), T_2.getOrigin().getY(),T_2.getOrigin().getZ() ) );
+                igb.world_to_orb_odom.setRotation ( tf2::Quaternion ( T_1.getRotation().getX(), T_1.getRotation().getY(), T_1.getRotation().getZ(), T_1.getRotation().getZ() ) );
+                igb.frontcam_to_base_link.setRotation ( tf2::Quaternion ( T_2.getRotation().getX(), T_2.getRotation().getY(), T_2.getRotation().getZ(), T_2.getRotation().getZ() ) );
+
+            } catch ( tf2::TransformException &ex ) {
+                ROS_WARN ( "%s",ex.what() );
+                continue;
+            }
+
+
+
         }
+        ros::spinOnce();
+
+        br.sendTransform ( igb.T_wo );
+        br.sendTransform ( igb.T_of );
+        br.sendTransform ( igb.T_fb );
+
         loop_rate.sleep();
     }
 
@@ -129,9 +163,6 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
     // if points can be tracked then broadcast the pose
     if ( not pose.empty() ) {
         if ( not initialized ) {
-            tf2::convert ( tf_buffer.lookupTransform ( "/odom", "/ardrone_base_frontcam", ros::Time ( 0 ) ), world_to_orb_odom );
-            tf2::convert ( tf_buffer.lookupTransform ( "/adrone_base_frontcam", "/adrone_base_link", ros::Time ( 0 ) ), frontcam_to_base_link );
-
             initialized = true;
         }
 
@@ -143,25 +174,12 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
                                   pose.at<float> ( 1,0 ), pose.at<float> ( 1,1 ), pose.at<float> ( 1,2 ),
                                   pose.at<float> ( 2,0 ), pose.at<float> ( 2,1 ), pose.at<float> ( 2,2 ) );
 
-        orb_odom_to_frontcam = tf2::Transform ( rotation.transpose(), rotation.transpose() * translation * -1);
+        orb_odom_to_frontcam = tf2::Transform ( rotation.transpose(), rotation.transpose() * translation * -1 );
 
         // broadcast all transforms
-        geometry_msgs::TransformStamped T_wo, T_of, T_fb;
-
-        T_wo.transform = tf2::toMsg ( world_to_orb_odom );
-        T_of.transform = tf2::toMsg ( orb_odom_to_frontcam );
-        T_fb.transform = tf2::toMsg ( frontcam_to_base_link );
-
-        T_wo.header.stamp = T_of.header.stamp = T_fb.header.stamp = ros::Time::now();
-
-        T_wo.child_frame_id = T_of.header.frame_id = "/orb/odom";
-        T_of.child_frame_id = T_fb.header.frame_id = "/orb/frontcam";
-        T_fb.child_frame_id = "/orb/base_link";
-        T_wo.header.frame_id = "/world";
-
-        br.sendTransform ( T_wo );
-        br.sendTransform ( T_of );
-        br.sendTransform ( T_fb );
+        T_wo = toTFStamped ( world_to_orb_odom, ros::Time::now(), "/world", "/orb/odom" );
+        T_of = toTFStamped ( orb_odom_to_frontcam, ros::Time::now(), "/orb/odom", "/orb/frontcam" );
+        T_fb = toTFStamped ( frontcam_to_base_link, ros::Time::now(), "/orb/frontcam", "/orb/base_link" );
 
         // get pose of base_link in world frame
         tf2::Transform T_wb = world_to_orb_odom * orb_odom_to_frontcam * frontcam_to_base_link;
@@ -169,7 +187,11 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         // set pose
         pose_out_.header.stamp = ros::Time::now();
 
-        pose_out_.pose.pose.orientation = tf2::toMsg ( T_wb.getRotation() );
+        pose_out_.pose.pose.orientation.x = T_wb.getRotation().getX();
+        pose_out_.pose.pose.orientation.y = T_wb.getRotation().getY();
+        pose_out_.pose.pose.orientation.z = T_wb.getRotation().getZ();
+        pose_out_.pose.pose.orientation.w = T_wb.getRotation().getW();
+
         pose_out_.pose.pose.position.x = T_wb.getOrigin().getX();
         pose_out_.pose.pose.position.y= T_wb.getOrigin().getY();
         pose_out_.pose.pose.position.z = T_wb.getOrigin().getZ();
@@ -205,6 +227,25 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         pc.points.push_back ( pp );
     }
 
+}
+
+geometry_msgs::TransformStamped ImageGrabber::toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id )
+{
+    geometry_msgs::TransformStamped out;
+    out.child_frame_id = child_frame_id;
+    out.header.frame_id = frame_id;
+    out.header.stamp = t;
+
+    out.transform.rotation.x = in.getRotation().getX();
+    out.transform.rotation.y = in.getRotation().getY();
+    out.transform.rotation.z = in.getRotation().getZ();
+    out.transform.rotation.w = in.getRotation().getW();
+
+    out.transform.translation.x = in.getOrigin().getX();
+    out.transform.translation.y = in.getOrigin().getY();
+    out.transform.translation.z = in.getOrigin().getZ();
+
+    return out;
 }
 
 
