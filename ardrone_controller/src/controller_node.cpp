@@ -105,7 +105,7 @@ public:
         quat_cam_drone = r3*r2*r1;
         
         tf::Vector3 origin(0.0,0.0,0.0);
-        level.setOrigin(origin);
+        level.setOrigin(origin); 
         level.setRotation(quat_cam_drone);
         odom_pos = tf::quatRotate(quat_cam_drone,slam_pos);
         //br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "/ardrone_base_link", "/level"));
