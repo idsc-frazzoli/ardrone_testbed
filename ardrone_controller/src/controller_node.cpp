@@ -109,29 +109,6 @@ public:
         }
     }
     
-    void EKF_callback(sensor_fusion_comm::DoubleArrayStamped msg)
-    {
-	ekf_pose_out_.pose.pose.position.x = msg.data[0];
-	ekf_pose_out_.pose.pose.position.y = msg.data[1];
-	ekf_pose_out_.pose.pose.position.z = msg.data[2];
-	
-	ekf_pose_out_.pose.pose.orientation.x = msg.data[7];
-	ekf_pose_out_.pose.pose.orientation.y = msg.data[8];
-	ekf_pose_out_.pose.pose.orientation.z = msg.data[9];
-	ekf_pose_out_.pose.pose.orientation.w = msg.data[6];
-	
-	ekf_pose_out_.header.frame_id = "world";
-	ekf_pose_out_.header.stamp = ros::Time::now();
-	
-	ekf_odom_out_.header.stamp = ros::Time::now();
-	ekf_odom_out_.pose.covariance = ekf_pose_out_.pose.covariance;
-	//ekf_odom_out_.pose.covariance[1] = 10000;
-	ekf_odom_out_.pose.pose = ekf_pose_out_.pose.pose;
-	ekf_odom_out_.header.frame_id = "world";
-	ekf_odom_out_.child_frame_id = "v_odom";
-	
-    }
-    
     // TODO test
     void calibrate(int N, float time)
     {
