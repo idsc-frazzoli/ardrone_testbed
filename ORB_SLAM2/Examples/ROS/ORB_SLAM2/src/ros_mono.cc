@@ -78,7 +78,7 @@ int main(int argc, char **argv)
     ros::NodeHandle nodeHandler;
     ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
     ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/environment/point_cloud", 2);
-    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("/orb_pose_unscaled",2);
+    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("/orb/pose_unscaled",2);
     
     ros::Rate loop_rate(30);
     
@@ -184,25 +184,14 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	//sufficiently accurate
 	cam_to_base_link_transform.setOrigin(tf::Vector3(0, 0, 0)); 
 
-	//now all rotation/translation axis are set correctly
-	//however, we rotate the frame to align with odom (this is cosmetics only
-	tf::Quaternion r1 = tf::createQuaternionFromRPY(0,-M_PI/2,0);
-        tf::Quaternion r2 = tf::createQuaternionFromRPY(M_PI/2.0,0.0,0.0);
-        
-        tf::Quaternion correction = r1*r2;
-        
-	tf::Transform correction_transform;
-	correction_transform.setRotation(correction);
-	correction_transform.setOrigin(tf::Vector3(0, 0, 0));	//just for clarification reasons
-	
 	//Apply transformation and correction
 	tf::Transform pose_out_corrected;
-	pose_out_corrected = cam_to_base_link_transform*first_keyframe_to_orb_pose_transform*correction_transform;
+	pose_out_corrected = cam_to_base_link_transform*first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse();
 	
 	//Broadcast all transforms
 	//br.sendTransform(tf::StampedTransform(pose_out_corrected, t, "odom", "/orb_pose_unscaled_corrected"));			//ONLY FOR DEBUGGING - UNNECESSARY TF LATER
-	//br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform, t, "/first_keyframe", "/orb_pose_unscaled")); 	//ONLY FOR DEBUGGING - UNNECESSARY TF LATER
-	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*correction_transform, t, "/first_keyframe", "/orb_pose_unscaled_corrected"));
+	//br.sendTransform(tf::StampedTransform(pose_out_corrected, t, "/odom", "/testing")); 						//ONLY FOR DEBUGGING - UNNECESSARY TF LATER
+	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse(), t, "/first_keyframe", "/orb_pose_unscaled_corrected"));
     	br.sendTransform(tf::StampedTransform(first_keyframe_to_odom_transform, t, "odom", "/first_keyframe"));
 	
 	//generate pose for robot_localization EKF sensor fusion
