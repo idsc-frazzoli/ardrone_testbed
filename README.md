@@ -1,7 +1,15 @@
 # AR drone workspace
 This git repo contains the ROS packages for running the AR drone autonomously
 
-##Packages
+## Code Style Suggestions
+class names: MyClass
+class object names: myObject
+variable names: my_variable
+file_names: my_header.h, my_source_file.cpp
+
+All member variables in a class should be private with commented functions for accessing (or modifying) those variables.
+
+## Packages
 --ardrone_autonomy
 This is the driver that lets us communicate with the drone through ROS. It is more or less identical to the repo here:
 
@@ -20,29 +28,48 @@ You will have to follow the setup instructions in the readme for this package VE
 
 
 ##Catkin Setup
-1) You should create a local catking workspace for the packages:
+1) You should create a local catkin workspace for the packages. Wherever you will have the top level directory run:
 
 ```
 mkdir ardrone_ws && cd ardrone_ws && mkdir src 
 ``` 
-2) Clone the packages in the src folder
+2) Go into the src folder and clone the project
 
 ```
 cd ardrone_ws/src
 git clone git@github.mit.edu:bapaden/ardrone_glc.git
 ```
 
-3) Build ORB_SLAM without catkin since it uses the old ROS build system. Follow the directions on the orb slam git repo carefully.
-
-4) Initialize the catkin workspace
+3) Go to the ORB_SLAM folder:
 
 ```
-cd ardrone_ws/ardrone_glc/src
+cd ardrone_ws/src/ardrone_glc/ORB_SLAM
+```
+
+4) Install the dependancies described here: [Monocular slam repo](https://github.com/raulmur/ORB_SLAM2)
+
+5) Compile ORB_SLAM. In the ORB_SLAM directory:
+
+```
+build_ros.sh
+```
+
+6) create a catkin_workspace
+
+```
+cd ardrone_ws/src/
 catkin_init_workspace
-cd ..
+``` 
+
+7) Run catkin_make to compile everything in the project
+
+```
+cd ardrone_ws/
 catkin_make
 ```
- 
 
 
+## Possible issues
+OpenCV requires gkt2 and ORB_SLAM will crash if both gtk2 and gtk3 are installed
+CMakelists are currently checking for OpenCV 3.2, but any version will work. We can check for version 3.0 if needed.
 
