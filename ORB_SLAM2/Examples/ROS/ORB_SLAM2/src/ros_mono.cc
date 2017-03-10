@@ -189,9 +189,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	pose_out_corrected = cam_to_base_link_transform*first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse();
 	
 	//Broadcast all transforms
-	//br.sendTransform(tf::StampedTransform(pose_out_corrected, t, "odom", "/orb_pose_unscaled_corrected"));			//ONLY FOR DEBUGGING - UNNECESSARY TF LATER
-	//br.sendTransform(tf::StampedTransform(pose_out_corrected, t, "/odom", "/testing")); 						//ONLY FOR DEBUGGING - UNNECESSARY TF LATER
-	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse(), t, "/first_keyframe", "/orb_pose_unscaled_corrected"));
+	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse(), t, "/first_keyframe", "/orb_pose_unscaled"));
     	br.sendTransform(tf::StampedTransform(first_keyframe_to_odom_transform, t, "odom", "/first_keyframe"));
 	
 	//generate pose for robot_localization EKF sensor fusion

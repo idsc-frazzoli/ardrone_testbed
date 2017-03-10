@@ -191,7 +191,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 
 		//-------------------------
 
-		ros::param::param("~enable_navdata_raw_measures", enabled_navdata_raw_measures, false);
+		ros::param::param("~enable_navdata_raw_measures", enabled_navdata_raw_measures, true);
 		if(enabled_navdata_raw_measures)
 		{
 			pub_navdata_raw_measures = node_handle.advertise<ardrone_autonomy::navdata_raw_measures>("ardrone/navdata_raw_measures", NAVDATA_QUEUE_SIZE);
@@ -255,7 +255,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 
 		//-------------------------
 
-		ros::param::param("~enable_navdata_altitude", enabled_navdata_altitude, false);
+		ros::param::param("~enable_navdata_altitude", enabled_navdata_altitude, true);
 		if(enabled_navdata_altitude)
 		{
 			pub_navdata_altitude = node_handle.advertise<ardrone_autonomy::navdata_altitude>("ardrone/navdata_altitude", NAVDATA_QUEUE_SIZE);
