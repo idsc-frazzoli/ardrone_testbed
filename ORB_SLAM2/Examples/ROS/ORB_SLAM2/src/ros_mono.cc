@@ -22,99 +22,105 @@
 #include<algorithm>
 #include<fstream>
 #include<chrono>
-#include <math.h> 
+#include <math.h>
 
 #include <ros/ros.h>
 
 #include <sensor_msgs/PointCloud.h>
 #include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
-#include <tf/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Vector3.h>
+#include <tf2/convert.h>
+#include <tf2/LinearMath/Transform.h>
 
 #include<opencv2/core/core.hpp>
 
-#include"../../../include/System.h"
+#include "../../../include/System.h"
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
-
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <tf/transform_datatypes.h>
+#include <tf2/LinearMath/Matrix3x3.h>
 
 using namespace std;
 
 class ImageGrabber
 {
 public:
-    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), pc(){
+    ImageGrabber ( ORB_SLAM2::System* pSLAM ) :mpSLAM ( pSLAM ), pc() {
         pc.header.frame_id= "/first_keyframe";
+        pose_out_.header.frame_id = "/odom";
     }
-    void GrabImage(const sensor_msgs::ImageConstPtr& msg);
-    
+    void GrabImage ( const sensor_msgs::ImageConstPtr& msg );
+    geometry_msgs::TransformStamped toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id );
+
+
     ORB_SLAM2::System* mpSLAM;
-    
-    sensor_msgs::PointCloud pc;
+
     bool initialized = false;
+
+    sensor_msgs::PointCloud pc;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
     
     tf::StampedTransform first_keyframe_to_odom_transform;
     tf::TransformListener tf_listener;
+    
+    tf::TransformBroadcaster br;
 };
 
-int main(int argc, char **argv)
+int main ( int argc, char **argv )
 {
-    ros::init(argc, argv, "Mono");
+    ros::init ( argc,argv,"Mono" );
     ros::start();
-    
-    if(argc != 3)
-    {
-        cerr << endl << "Usage: rosrun ORB_SLAM2 Mono path_to_vocabulary path_to_settings" << endl;        
+
+    if ( argc != 3 ) {
+        cerr << endl << "Usage: rosrun ORB_SLAM2 Mono path_to_vocabulary path_to_settings" << endl;
         ros::shutdown();
         return 1;
-    }    
-    
+    }
+
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
-    
-    ImageGrabber igb(&SLAM);
-    
+    ORB_SLAM2::System SLAM ( argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true );
+
+    ImageGrabber igb ( &SLAM );
+
     ros::NodeHandle nodeHandler;
     ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
-    ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/environment/point_cloud", 2);
+    ros::Publisher pc_pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/orb/point_cloud", 2);
     ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("/orb/pose_unscaled",2);
     
     ros::Rate loop_rate(30);
     
     while (ros::ok()) {    
         ros::spinOnce();
-        pub.publish(igb.pc);
-	if (igb.initialized) pose_pub.publish(igb.pose_out_);
+	pc_pub.publish(igb.pc);
+	pose_pub.publish(igb.pose_out_);
         loop_rate.sleep();
     }
-    
-    
+
+
     // Stop all threads
     SLAM.Shutdown();
-    
+
     // Save camera trajectory
     //SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
     
     ros::shutdown();
-    
+
     return 0;
 }
 
 //callback
-void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
+void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 {
-    static tf::TransformBroadcaster br;
-    tf::Transform transform;
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptr;
-    try
-    {
-        cv_ptr = cv_bridge::toCvShare(msg);
-    }
-    catch (cv_bridge::Exception& e)
-    {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
+    try {
+        cv_ptr = cv_bridge::toCvShare ( msg );
+    } catch ( cv_bridge::Exception& e ) {
+        ROS_ERROR ( "cv_bridge exception: %s", e.what() );
         return;
     }
     //     Main slam routine. Extracts new pose
@@ -134,9 +140,12 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     //of the drone is connected) and published by the ardrone driver. Odom must not be changed at any time afterwards.
     //
     //The first keyframe transformation is set once the orb slam initializes (meaning it is able to estimate a position 
-    //for the first time). It is set to be the transformation from odom to base_link (published by the driver). 
-    //Since odom is set by the imu, this step is necessary to bring both sensors to the same coordinate base (namely odom). 
-    //This transformation must also not change at any time after it's initialization.
+    //for the first time). It is set to be the transformation from odom to ardrone_base_frontcam (published by the driver).
+    //Odom is defined relative to the real world in a way that g(ravitation) is facing in negative z direction. This means
+    //that 0 roll and 0 pitch ALWAYS means that the drone is in the horizontal plane of the earth. Since the IMU is not
+    //able to make a reasonable yaw estimate itself, it uses the (arbitrary) direction of the drone at the time point where
+    //the plug on the drone is connected as 0 yaw. This value will not change until the drone itself is shut off (regardless
+    //of the driver node being turned on and off).
     //
     //Camera frames for some reason always come in a way such that the z axis is pointing forwards while the y axis is
     //facing downwards. This has to be corrected through a manual rotation such that eventually the orb pose values 
@@ -151,7 +160,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	if (not initialized) {
 	//Initialization - set link between 'odom' and 'first_keyframe' frames
 	
-	tf_listener.lookupTransform("odom", "/ardrone_base_frontcam", ros::Time(0), first_keyframe_to_odom_transform);
+	tf_listener.lookupTransform("/odom", "/ardrone_base_frontcam", ros::Time(0), first_keyframe_to_odom_transform);
 	first_keyframe_to_odom_transform.setOrigin(tf::Vector3(0, 0, 0));	//just for clarification reasons
 	initialized = true;
     }   
@@ -189,12 +198,11 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	pose_out_corrected = cam_to_base_link_transform*first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse();
 	
 	//Broadcast all transforms
-	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse(), t, "/first_keyframe", "/orb_pose_unscaled"));
     	br.sendTransform(tf::StampedTransform(first_keyframe_to_odom_transform, t, "odom", "/first_keyframe"));
+	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse(), t, "/first_keyframe", "/orb_pose_unscaled"));
 	
 	//generate pose for robot_localization EKF sensor fusion
 	//the pose is simply generated from the above derived transformations
-	pose_out_.header.frame_id = "odom";
 	pose_out_.header.stamp = t;
 	
 	tf::Quaternion pose_orientation = pose_out_corrected.getRotation();
@@ -220,25 +228,23 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 	pose_out_.pose.covariance[28] = 1;
 	pose_out_.pose.covariance[35] = 1;
     }
-    
+
     // gets points from most recent frame
     // gets all points
     const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
     // TODO: make efficient (use mpSLAM->GetTrackedMapPoints() to get most recent points)
     pc.points.clear();
-    for(size_t i=0; i<point_cloud.size();i++)
-    {
-        if(point_cloud[i]->isBad()/* or spRefMPs.count(vpMPs[i])*/)
+    for ( size_t i=0; i<point_cloud.size(); i++ ) {
+        if ( point_cloud[i]->isBad() /* or spRefMPs.count(vpMPs[i])*/ ) {
             continue;
+        }
         cv::Mat pos = point_cloud[i]->GetWorldPos();
         geometry_msgs::Point32 pp;
-        pp.x=pos.at<float>(0);
-        pp.y=pos.at<float>(1);
-        pp.z=pos.at<float>(2);
-        
-        pc.points.push_back(pp);
+        pp.x=pos.at<float> ( 0 );
+        pp.y=pos.at<float> ( 1 );
+        pp.z=pos.at<float> ( 2 );
+
+        pc.points.push_back ( pp );
     }
-    
+
 }
-
-
