@@ -46,14 +46,15 @@ using namespace std;
 class ImageGrabber
 {
 public:
-    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), pointCloud(){
-        pointCloud.header.frame_id= "/first_keyframe";
+    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM), rosPointCloud(){
+        rosPointCloud.header.frame_id= "/first_keyframe";
     }
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
+    void prepPointCloud();
     
     ORB_SLAM2::System* mpSLAM;
     
-    sensor_msgs::PointCloud pointCloud;
+    sensor_msgs::PointCloud rosPointCloud;
     bool initialized = false;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
     tf::Quaternion quat_cam_drone;
@@ -191,20 +192,29 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     
     // gets points from most recent frame
     // gets all points
-    const std::vector<ORB_SLAM2::MapPoint*> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
-    // TODO: make efficient (use mpSLAM->GetTrackedMapPoints() to get most recent points)
-    pointCloud.points.clear();
-    for(size_t i=0; i<point_cloud.size();i++)
+    
+}
+
+void ImageGrabber::prepPointCloud()
+{
+    //Get reference to ORB point cloud
+    std::vector<ORB_SLAM2::MapPoint*> localPointCloud = mpSLAM->mpMap->GetAllMapPoints(); 
+    //We are deleting the current point cloud and copying in the update from ORB
+    rosPointCloud.points.clear();
+    //Hopefully this will result in a balanced kd-tree
+    std::random_shuffle(localPointCloud.begin(),localPointCloud.end());
+    
+    for(size_t i=0; i<localPointCloud.size();i++)
     {
-        if(point_cloud[i]->isBad()/* or spRefMPs.count(vpMPs[i])*/)
+        if(localPointCloud[i]->isBad()/* or spRefMPs.count(vpMPs[i])*/)
             continue;
-        cv::Mat pos = point_cloud[i]->GetWorldPos();
+        cv::Mat pos = localPointCloud[i]->GetWorldPos();
         geometry_msgs::Point32 pp;
         pp.x=pos.at<float>(0);
         pp.y=pos.at<float>(1);
         pp.z=pos.at<float>(2);
         
-        pointCloud.points.push_back(pp);
+        rosPointCloud.points.push_back(pp);
     }
     
 }
@@ -246,10 +256,11 @@ int main(int argc, char **argv)
             pose_pub.publish(imageGrabber.pose_out_);
         }
         now = time(NULL);
-        if(now-before>1.0)//HACK?
+        if((float)(now-before)>0.85)//HACK?
         {
             before = now;
-            pub.publish(imageGrabber.pointCloud);
+            imageGrabber.prepPointCloud();
+            pub.publish(imageGrabber.rosPointCloud);
         }
 
         loop_rate.sleep();

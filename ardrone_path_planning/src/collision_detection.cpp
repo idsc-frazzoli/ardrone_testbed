@@ -12,7 +12,7 @@ class PointCloudEnvironment : public glc::Obstacles
     
 public:
     //The pointcloud is 3D 
-    void updatePointCloud(const sensor_msgs::PointCloud& new_point_cloud)//TODO copy necessary?
+    void updatePointCloud(const sensor_msgs::PointCloud& new_point_cloud)
     {
         std::cout << "Received new point cloud of size " << new_point_cloud.points.size() << " from SLAM alg. " << std::endl;
         //rebuild kdtree for each new point cloud
@@ -21,7 +21,7 @@ public:
         kdtree = new kdtree::Kdtree(3);
         //incremental build of kdtree
         clock_t t = clock();
-        for(int i=0;i<new_point_cloud.points.size();i++)//TODO debuging with only 100
+        for(int i=0;i<new_point_cloud.points.size();i++)
         {
             
             kdtree::point p({new_point_cloud.points[i].x,
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
     ros::NodeHandle node_handle;
     ros::Subscriber point_cloud_sub = node_handle.subscribe("environment/point_cloud", 2, &PointCloudEnvironment::updatePointCloud, &obstacles);
     
-    ros::Rate loop_rate(2);
+    ros::Rate loop_rate(1.5);
     while(ros::ok())
     {
         
