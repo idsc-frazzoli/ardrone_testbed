@@ -1,5 +1,3 @@
-// modified to include  #include <unistd.h> from J. Londschien
-
 /**
 * This file is part of ORB-SLAM2.
 *
@@ -36,8 +34,6 @@
 #include"PnPsolver.h"
 
 #include<iostream>
-
-#include <unistd.h>
 
 #include<mutex>
 
