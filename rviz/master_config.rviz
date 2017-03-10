@@ -66,8 +66,8 @@ Visualization Manager:
         odom:
           Value: true
         orb_pose_unscaled_corrected:
-          Value: true
-      Marker Scale: 1
+          Value: false
+      Marker Scale: 3
       Name: TF
       Show Arrows: true
       Show Axes: true
@@ -189,39 +189,9 @@ Visualization Manager:
       Shaft Length: 1
       Shaft Radius: 0.0500000007
       Shape: Arrow
-      Topic: /orb_pose_unscaled
+      Topic: /orb/pose_unscaled
       Unreliable: false
       Value: true
-    - Alpha: 1
-      Axes Length: 1
-      Axes Radius: 0.100000001
-      Class: rviz_plugin_covariance/PoseWithCovariance
-      Color: 255; 25; 0
-      Covariance:
-        Orientation:
-          Alpha: 0.5
-          Color: 255; 255; 127
-          Color Style: Unique
-          Frame: Local
-          Offset: 1
-          Scale: 1
-          Value: true
-        Position:
-          Alpha: 0.300000012
-          Color: 204; 51; 204
-          Scale: 1
-          Value: true
-        Value: true
-      Enabled: false
-      Head Length: 0.300000012
-      Head Radius: 0.100000001
-      Name: PoseWithCovariance
-      Shaft Length: 1
-      Shaft Radius: 0.0500000007
-      Shape: Arrow
-      Topic: /ekf_pose
-      Unreliable: false
-      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -246,7 +216,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.46290064
+      Distance: 5.36628437
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
@@ -260,10 +230,10 @@ Visualization Manager:
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.430203855
+      Pitch: 0.490203798
       Target Frame: ardrone_base_frontcam
       Value: Orbit (rviz)
-      Yaw: 1.83905733
+      Yaw: 2.5840497
     Saved: ~
 Window Geometry:
   Displays:

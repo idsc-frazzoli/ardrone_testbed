@@ -193,20 +193,9 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 	//sufficiently accurate
 	cam_to_base_link_transform.setOrigin(tf::Vector3(0, 0, 0)); 
 
-	//now all rotation/translation axis are set correctly
-	//however, we rotate the frame to align with odom (this is cosmetics only
-	tf::Quaternion r1 = tf::createQuaternionFromRPY(0,-M_PI/2,0);
-        tf::Quaternion r2 = tf::createQuaternionFromRPY(M_PI/2.0,0.0,0.0);
-        
-        tf::Quaternion correction = r1*r2;
-        
-	tf::Transform correction_transform;
-	correction_transform.setRotation(correction);
-	correction_transform.setOrigin(tf::Vector3(0, 0, 0));	//just for clarification reasons
-	
 	//Apply transformation and correction
 	tf::Transform pose_out_corrected;
-	pose_out_corrected = cam_to_base_link_transform*first_keyframe_to_orb_pose_transform*correction_transform;
+	pose_out_corrected = cam_to_base_link_transform*first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse();
 	
 	//Broadcast all transforms
 	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*correction_transform, t, "/first_keyframe", "/orb_pose_unscaled_corrected"));
