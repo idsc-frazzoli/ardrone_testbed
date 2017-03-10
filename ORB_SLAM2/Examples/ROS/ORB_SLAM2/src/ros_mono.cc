@@ -36,7 +36,7 @@
 
 #include<opencv2/core/core.hpp>
 
-#include"../../../include/System.h"
+#include "../../../include/System.h"
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -50,8 +50,8 @@ class ImageGrabber
 {
 public:
     ImageGrabber ( ORB_SLAM2::System* pSLAM ) :mpSLAM ( pSLAM ), pc() {
-        pc.header.frame_id= "/orb/odom";
-        pose_out_.header.frame_id = "/orb/odom";
+        pc.header.frame_id= "/first_keyframe";
+        pose_out_.header.frame_id = "/odom";
     }
     void GrabImage ( const sensor_msgs::ImageConstPtr& msg );
     geometry_msgs::TransformStamped toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id );
@@ -66,6 +66,8 @@ public:
     
     tf::StampedTransform first_keyframe_to_odom_transform;
     tf::TransformListener tf_listener;
+    
+    tf::TransformBroadcaster br;
 };
 
 int main ( int argc, char **argv )
@@ -86,18 +88,15 @@ int main ( int argc, char **argv )
 
     ros::NodeHandle nodeHandler;
     ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
-    ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/environment/point_cloud", 2);
-    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("/orb_pose_unscaled",2);
+    ros::Publisher pc_pub = nodeHandler.advertise<sensor_msgs::PointCloud>("/orb/point_cloud", 2);
+    ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped>("/orb/pose_unscaled",2);
     
     ros::Rate loop_rate(30);
     
     while (ros::ok()) {    
         ros::spinOnce();
-	
-        br.sendTransform ( igb.T_wo );
-        br.sendTransform ( igb.T_of );
-        br.sendTransform ( igb.T_fb );
-
+	pc_pub.publish(igb.pc);
+	pose_pub.publish(igb.pose_out_);
         loop_rate.sleep();
     }
 
@@ -141,9 +140,12 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
     //of the drone is connected) and published by the ardrone driver. Odom must not be changed at any time afterwards.
     //
     //The first keyframe transformation is set once the orb slam initializes (meaning it is able to estimate a position 
-    //for the first time). It is set to be the transformation from odom to base_link (published by the driver). 
-    //Since odom is set by the imu, this step is necessary to bring both sensors to the same coordinate base (namely odom). 
-    //This transformation must also not change at any time after it's initialization.
+    //for the first time). It is set to be the transformation from odom to ardrone_base_frontcam (published by the driver).
+    //Odom is defined relative to the real world in a way that g(ravitation) is facing in negative z direction. This means
+    //that 0 roll and 0 pitch ALWAYS means that the drone is in the horizontal plane of the earth. Since the IMU is not
+    //able to make a reasonable yaw estimate itself, it uses the (arbitrary) direction of the drone at the time point where
+    //the plug on the drone is connected as 0 yaw. This value will not change until the drone itself is shut off (regardless
+    //of the driver node being turned on and off).
     //
     //Camera frames for some reason always come in a way such that the z axis is pointing forwards while the y axis is
     //facing downwards. This has to be corrected through a manual rotation such that eventually the orb pose values 
@@ -158,7 +160,7 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 	if (not initialized) {
 	//Initialization - set link between 'odom' and 'first_keyframe' frames
 	
-	tf_listener.lookupTransform("odom", "/ardrone_base_frontcam", ros::Time(0), first_keyframe_to_odom_transform);
+	tf_listener.lookupTransform("/odom", "/ardrone_base_frontcam", ros::Time(0), first_keyframe_to_odom_transform);
 	first_keyframe_to_odom_transform.setOrigin(tf::Vector3(0, 0, 0));	//just for clarification reasons
 	initialized = true;
     }   
@@ -207,14 +209,11 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 	pose_out_corrected = cam_to_base_link_transform*first_keyframe_to_orb_pose_transform*correction_transform;
 	
 	//Broadcast all transforms
-	//br.sendTransform(tf::StampedTransform(pose_out_corrected, t, "odom", "/orb_pose_unscaled_corrected"));			//ONLY FOR DEBUGGING - UNNECESSARY TF LATER
-	//br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform, t, "/first_keyframe", "/orb_pose_unscaled")); 	//ONLY FOR DEBUGGING - UNNECESSARY TF LATER
 	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*correction_transform, t, "/first_keyframe", "/orb_pose_unscaled_corrected"));
-    	br.sendTransform(tf::StampedTransform(first_keyframe_to_odom_transform, t, "odom", "/first_keyframe"));
+    	br.sendTransform(tf::StampedTransform(first_keyframe_to_odom_transform, t, "/odom", "/first_keyframe"));
 	
 	//generate pose for robot_localization EKF sensor fusion
 	//the pose is simply generated from the above derived transformations
-	pose_out_.header.frame_id = "odom";
 	pose_out_.header.stamp = t;
 	
 	tf::Quaternion pose_orientation = pose_out_corrected.getRotation();
@@ -260,24 +259,3 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
     }
 
 }
-
-geometry_msgs::TransformStamped ImageGrabber::toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id )
-{
-    geometry_msgs::TransformStamped out;
-    out.child_frame_id = child_frame_id;
-    out.header.frame_id = frame_id;
-    out.header.stamp = t;
-
-    out.transform.rotation.x = in.getRotation().getX();
-    out.transform.rotation.y = in.getRotation().getY();
-    out.transform.rotation.z = in.getRotation().getZ();
-    out.transform.rotation.w = in.getRotation().getW();
-
-    out.transform.translation.x = in.getOrigin().getX();
-    out.transform.translation.y = in.getOrigin().getY();
-    out.transform.translation.z = in.getOrigin().getZ();
-
-    return out;
-}
-
-

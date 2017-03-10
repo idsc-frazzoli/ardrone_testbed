@@ -158,11 +158,6 @@ int main(int argc, char **argv)
     ros::Subscriber imu_sub = nh.subscribe<sensor_msgs::Imu>( "/ardrone/imu", 10,  &OdometryIMU::imu_msg_callback, &od_IMU);
     ros::Subscriber mag_sub = nh.subscribe<geometry_msgs::Vector3Stamped>("/ardrone/mag", 10, &OdometryIMU::mag_callback, &od_IMU);
     
-    // fused data from ekf
-    ros::Subscriber EKF_sub = nh.subscribe<sensor_fusion_comm::DoubleArrayStamped>("/ssf_core/state_out", 2, &OdometryIMU::EKF_callback, &od_IMU);
-    
-    ros::Publisher ekf_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/ekf_pose", 2);
-    ros::Publisher ekf_publisher = nh.advertise<nav_msgs::Odometry>("/vo",2);
     
     ros::Rate loop_rate(30); //the received msg is published at 200Hz.
     
