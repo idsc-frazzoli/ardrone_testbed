@@ -22,6 +22,7 @@
 #include <iostream>
 #include <algorithm>
 #include <fstream>
+#include <random>
 #include <chrono>
 #include <time.h>
 #include <math.h> 
@@ -197,12 +198,17 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 
 void ImageGrabber::prepPointCloud()
 {
+    
+    // obtain a time-based seed:
+    
+    
     //Get reference to ORB point cloud
     std::vector<ORB_SLAM2::MapPoint*> localPointCloud = mpSLAM->mpMap->GetAllMapPoints(); 
     //We are deleting the current point cloud and copying in the update from ORB
     rosPointCloud.points.clear();
     //Hopefully this will result in a balanced kd-tree
-    std::random_shuffle(localPointCloud.begin(),localPointCloud.end());
+//     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+//     std::shuffle(localPointCloud.begin(),localPointCloud.end(),std::default_random_engine(seed));
     
     for(size_t i=0; i<localPointCloud.size();i++)
     {

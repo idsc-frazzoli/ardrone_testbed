@@ -21,16 +21,18 @@ public:
         kdtree = new kdtree::Kdtree(3);
         //incremental build of kdtree
         clock_t t = clock();
+        
+        std::vector<kdtree::vertexPtr> data;
         for(int i=0;i<new_point_cloud.points.size();i++)
         {
             
             kdtree::point p({new_point_cloud.points[i].x,
                 new_point_cloud.points[i].y,
                 new_point_cloud.points[i].z});
-            
             kdtree::vertexPtr vtx(new kdtree::Vertex(p));
-            kdtree->insert(vtx);
+            data.push_back(vtx);
         }
+            kdtree->batchBuild(data);
         
         std::cout << " Built kdtree in " << ((float)(clock()-t))/CLOCKS_PER_SEC << " seconds " << std::endl;
     }
@@ -43,7 +45,7 @@ public:
             if(not kdtree->isEmpty())
             {
                 kdtree::query_results<kdtree::vertexPtr, kdtree::numT> nearest = kdtree->query(state,1);
-                std::cout << "Depth of tree " << nearest.depth << std::endl;
+                std::cout << "Depth of tree " << kdtree->depth() << std::endl;
                 if(kdtree::norm2(nearest.BPQ.queue.top().vtx_ptr->coord - state)<radius)
                     return false;
             }

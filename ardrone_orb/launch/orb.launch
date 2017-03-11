@@ -3,4 +3,3 @@
 	    <remap from="/camera/image_raw" to="/ardrone/front/image_raw" />
 		</node>
 </launch>
-
