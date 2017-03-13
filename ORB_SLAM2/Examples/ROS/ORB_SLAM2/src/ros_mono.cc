@@ -61,6 +61,7 @@ public:
     ORB_SLAM2::System* mpSLAM;
 
     bool initialized = false;
+    bool debug_mode = false;
 
     sensor_msgs::PointCloud pc;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
@@ -189,7 +190,6 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         tf::Transform orb_pose_unscaled_cam_to_first_keyframe_cam = cvMatToTF ( Tcw );
         ros::Time t = ros::Time::now();
 	
-	bool debug_mode = true;
 	if(debug_mode){
 	  // odom to second_keyframe_base_link
 	  br.sendTransform ( tf::StampedTransform ( odom_to_second_keyframe_base_transform, t, "odom", "/second_keyframe_base_link" ) );
@@ -210,29 +210,25 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 	  br.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation.inverse(), t, "/orb_pose_unscaled_cam", "/orb_pose_unscaled" ) );
 	}
 	else{
-	  //TODO: reduced publishing comes in here
+	  tf::Transform output = odom_to_second_keyframe_base_transform
+					*base_link_to_camera_transform_no_translation
+					*second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
+					*base_link_to_camera_transform_no_translation.inverse();
+	  br.sendTransform (tf::StampedTransform ( output , t, "odom", "/first_keyframe_base_link" ) );
 	}
-
-	tf::Transform pose_out_corrected = odom_to_second_keyframe_base_transform
-					    *base_link_to_camera_transform_no_translation
-					    *second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
-					    *orb_pose_unscaled_cam_to_first_keyframe_cam
-					    *base_link_to_camera_transform_no_translation.inverse();
-// 	(base_link_to_camera_transform_no_translation.inverse()
-// 					   *orb_pose_unscaled_cam_to_first_keyframe_cam
-// 					   *second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
-// 					   *base_link_to_camera_transform_no_translation
-// 					   *odom_to_second_keyframe_transform).inverse();
-// 	
-
-	
+	  
+	tf::Transform pose_out = odom_to_second_keyframe_base_transform
+				 *base_link_to_camera_transform_no_translation
+				 *second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
+				 *orb_pose_unscaled_cam_to_first_keyframe_cam
+				 *base_link_to_camera_transform_no_translation.inverse();
 
         //generate pose for robot_localization EKF sensor fusion
         //the pose is simply generated from the above derived transformations
         pose_out_.header.stamp = t;
 
-        tf::Quaternion pose_orientation = pose_out_corrected.getRotation();
-        tf::Vector3 pose_origin = pose_out_corrected.getOrigin();
+        tf::Quaternion pose_orientation = pose_out.getRotation();
+        tf::Vector3 pose_origin = pose_out.getOrigin();
         pose_out_.pose.pose.orientation.x = pose_orientation.getX();
         pose_out_.pose.pose.orientation.y = pose_orientation.getY();
         pose_out_.pose.pose.orientation.z = pose_orientation.getZ();
