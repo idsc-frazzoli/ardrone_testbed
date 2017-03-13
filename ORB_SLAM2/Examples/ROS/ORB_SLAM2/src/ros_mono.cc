@@ -55,7 +55,7 @@ public:
     }
     void GrabImage ( const sensor_msgs::ImageConstPtr& msg );
     geometry_msgs::TransformStamped toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id );
-
+    tf::Transform cvMatToTF(cv::Mat Tcw);
 
     ORB_SLAM2::System* mpSLAM;
 
@@ -115,6 +115,14 @@ int main ( int argc, char **argv )
 //callback
 void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 {
+    if (not initialized) { // TODO: find first keyframe from first pose by 
+	//Initialization - set link between 'odom' and 'first_keyframe' frames
+	
+	tf_listener.lookupTransform("/odom", "/ardrone_base_frontcam", ros::Time(0), first_keyframe_to_odom_transform);
+	first_keyframe_to_odom_transform.setOrigin(tf::Vector3(0, 0, 0));	//just for clarification reasons
+	initialized = true;
+    }   
+    
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptr;
     try {
@@ -124,7 +132,11 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         return;
     }
     //     Main slam routine. Extracts new pose
-    cv::Mat pose = mpSLAM->TrackMonocular(cv_ptr->image,cv_ptr->header.stamp.toSec());
+    // (from ORB_SLAM2 API)
+    // Proccess the given monocular frame
+    // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
+    // Returns the camera pose (empty if tracking fails).
+    cv::Mat Tcw = mpSLAM->TrackMonocular(cv_ptr->image,cv_ptr->header.stamp.toSec());
     
     
     //////////////////////////////////TRANSFORMATIONS//////////////////////////////////////////////////////////////////
@@ -155,38 +167,16 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
     
     
     // if points can be tracked then broadcast the pose 
-    if (not pose.empty()) {
-
-	if (not initialized) {
-	//Initialization - set link between 'odom' and 'first_keyframe' frames
-	
-	tf_listener.lookupTransform("/odom", "/ardrone_base_frontcam", ros::Time(0), first_keyframe_to_odom_transform);
-	first_keyframe_to_odom_transform.setOrigin(tf::Vector3(0, 0, 0));	//just for clarification reasons
-	initialized = true;
-    }   
-        //Extract transformation from the raw orb SLAM pose
-        tf::Vector3 origin;
-        tf::Quaternion transform_quat;
-        tf::Matrix3x3 transform_matrix;
-	tf::StampedTransform first_keyframe_to_orb_pose_transform;
-	
-        origin.setValue(pose.at<float>(0,3), pose.at<float>(1,3), pose.at<float>(2,3));
-        
-        transform_matrix.setValue(pose.at<float>(0,0), pose.at<float>(0,1), pose.at<float>(0,2), 
-                                  pose.at<float>(1,0), pose.at<float>(1,1), pose.at<float>(1,2), 
-                                  pose.at<float>(2,0), pose.at<float>(2,1), pose.at<float>(2,2));
-        
-        transform_matrix.getRotation(transform_quat); 
-        
-        first_keyframe_to_orb_pose_transform.setOrigin(transform_matrix.transpose() * origin * -1);
-        first_keyframe_to_orb_pose_transform.setRotation(transform_quat.inverse());
-	
+    if (not Tcw.empty()) {
+      
+	tf::Transform cam_to_first_keyframe_transform = cvMatToTF(Tcw);
 	//initialize some stuff
 	ros::Time t = ros::Time::now();
-	tf::Transform pose_out_tf_non_stamped;
 	tf::StampedTransform cam_to_base_link_transform;
 	
-	//Get correction transform
+	//Get correction transform 
+	//TODO only necessary once 
+	//TODO isolate pure rotation by introducing camera centered frame
 	tf_listener.lookupTransform("/ardrone_base_link", "/ardrone_base_frontcam", ros::Time(0), cam_to_base_link_transform); //camera frame correction
 	//The driver publishes a translation (because the camera is aprox. 15cm in front of the body center), but we do not have a scale at this point 
 	//so we cannot handle this transformation properly - the next line assumes that the camera is in the body frame (no translation) which is still
@@ -194,12 +184,16 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 	cam_to_base_link_transform.setOrigin(tf::Vector3(0, 0, 0)); 
 
 	//Apply transformation and correction
-	tf::Transform pose_out_corrected;
-	pose_out_corrected = cam_to_base_link_transform*first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse();
-	
+	tf::Transform unscaled_move_rel_to_frontcam_baselink = 
+	  //cam_to_base_link_transform* // FIXME!!!!
+	  cam_to_first_keyframe_transform*cam_to_base_link_transform.inverse();
+	tf::Transform pose_out_corrected = first_keyframe_to_odom_transform * unscaled_move_rel_to_frontcam_baselink; // TODO unscaled, tranformation with change of basis
+
 	//Broadcast all transforms
-    	br.sendTransform(tf::StampedTransform(first_keyframe_to_odom_transform, t, "odom", "/first_keyframe"));
-	br.sendTransform(tf::StampedTransform(first_keyframe_to_orb_pose_transform*cam_to_base_link_transform.inverse(), t, "/first_keyframe", "/orb_pose_unscaled"));
+	// Inverse was added in first sendTransform statement
+    	br.sendTransform(tf::StampedTransform(first_keyframe_to_odom_transform.inverse(), t, "odom", "/first_keyframe"));
+	br.sendTransform(tf::StampedTransform( cam_to_first_keyframe_transform*cam_to_base_link_transform.inverse(), t, 
+					       "/first_keyframe", "/orb_pose_unscaled"));
 	
 	//generate pose for robot_localization EKF sensor fusion
 	//the pose is simply generated from the above derived transformations
@@ -247,4 +241,26 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         pc.points.push_back ( pp );
     }
 
+}
+
+tf::Transform ImageGrabber::cvMatToTF ( cv::Mat Tcw )
+{
+  tf::Transform cam_to_first_keyframe_transform;
+  // invert since Tcw (transform from world to camera)
+  cv::Mat pose = Tcw.inv();
+    
+  //Extract transformation from the raw orb SLAM pose
+  tf::Vector3 origin;
+  //tf::Quaternion transform_quat;
+  tf::Matrix3x3 transform_matrix;
+  
+  origin.setValue(pose.at<float>(0,3), pose.at<float>(1,3), pose.at<float>(2,3));
+  
+  transform_matrix.setValue(pose.at<float>(0,0), pose.at<float>(0,1), pose.at<float>(0,2), 
+			    pose.at<float>(1,0), pose.at<float>(1,1), pose.at<float>(1,2), 
+			    pose.at<float>(2,0), pose.at<float>(2,1), pose.at<float>(2,2));
+  
+  //transform_matrix.getRotation(transform_quat); 
+  cam_to_first_keyframe_transform.setOrigin(origin);
+  cam_to_first_keyframe_transform.setBasis(transform_matrix);
 }
