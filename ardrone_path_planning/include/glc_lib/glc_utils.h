@@ -52,6 +52,7 @@ namespace glc{
             //return;
         }
         
+        //get last element
         void back(vctr& x, double& t) {
             x=states.back();
             t=time.back();
@@ -77,7 +78,7 @@ namespace glc{
             time[index]=t;
         }
         
-        void push_back(const vctr& x, double t)
+        void push_back(const vctr& x, const double t)
         {
             states.push_back(x);
             time.push_back(t);
@@ -173,7 +174,7 @@ namespace glc{
         static const nodePtr inf_cost_node;
         
         nodePtr parent;
-        std::vector< nodePtr > children;
+        std::vector< nodePtr > children;//TODO maybe std::unordered_map?
         vctr x;
         double t;
         double cost;
@@ -217,7 +218,7 @@ namespace glc{
              
     };
     
-    const nodePtr node::inf_cost_node(new node(0, DBL_MAX/2, 0.0, DBL_MAX/2));
+    const nodePtr node::inf_cost_node(new node(0, DBL_MAX/2, 0.0, DBL_MAX/2));//TODO used?
     
     class QueueOrder
     {
@@ -255,7 +256,7 @@ namespace glc{
         std::priority_queue<nodePtr, std::vector<nodePtr>, cptrcompare> candidates;
         
         Domain(){
-            label = node::inf_cost_node;
+            label = node::inf_cost_node;//Initialize to nullptr and don't use this thing
         }
         
         Domain(const nodePtr& _label)

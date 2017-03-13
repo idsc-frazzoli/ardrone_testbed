@@ -10,12 +10,14 @@ namespace glc{
     class Inputs
     {
     public:
-        std::deque<vctr> points;
+        std::deque<vctr> points;//TODO private and
         
         void addInputSample(vctr& _input)
         {
             points.push_back(_input);
         }
+        
+        
     };
     
     class Heuristic
@@ -121,28 +123,27 @@ namespace glc{
             {
                 step(x1,sol.getState(i),u,dt);
                 sol.push_back(x1, sol.getTime(i)+dt);
-                //sol.time.at(i+1)=sol.time.at(i)+dt;
             }
             sim_counter++;
             return;
         }
         
-        //integrate forward for tspan from x0 with constant u
-        Trajectory sim(double t0, double tf, const vctr& x0, const vctr& u)
-        {
-            Trajectory sol;
-            sim(sol, t0, tf, x0, u);
-            
-            return sol;
-        }
+//         //integrate forward for tspan from x0 with constant u
+//         Trajectory sim(double t0, double tf, const vctr& x0, const vctr& u)
+//         {
+//             Trajectory sol;
+//             sim(sol, t0, tf, x0, u);
+//             
+//             return sol;
+//         }
         
     };
     
     class EulerIntegrator : public DynamicalSystem
     {
-        vctr xdot;
+        vctr xdot;//For multithreading move into step function
     public:
-        EulerIntegrator(double _max_time_step):DynamicalSystem(_max_time_step){}
+        EulerIntegrator(int _dimension, double _max_time_step):DynamicalSystem(_max_time_step),xdot(_dimension){}
         void step(vctr& x_plus, const vctr& x, const vctr& u, const double dt) override
         {  
             flow(xdot,x,u);
@@ -152,7 +153,7 @@ namespace glc{
     
     class RungeKutta4 : public DynamicalSystem
     {
-        vctr k1,k2,k3,k4,temp;
+      vctr k1,k2,k3,k4,temp;//For multithreading move into step function
     public:
         RungeKutta4(double _max_time_step):DynamicalSystem(_max_time_step){}
         
@@ -177,7 +178,7 @@ namespace glc{
     class SingleIntegrator: public glc::EulerIntegrator
     {
     public:
-        SingleIntegrator(const double& _max_time_step): EulerIntegrator(_max_time_step) {}
+        SingleIntegrator(int _dimension, const double& _max_time_step): EulerIntegrator(_dimension,_max_time_step) {}
         
         void flow(vctr& dx, const vctr& x, const vctr& u) override
         {

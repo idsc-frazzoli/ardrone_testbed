@@ -146,12 +146,12 @@ namespace kdtree{
         }
         
         vertexPtr root;
-        unsigned int dimension, tree_size, tree_depth;
+        unsigned int tree_dimension, tree_size, tree_depth;
         unsigned int d_count;
     public:
         
         Kdtree():d_count(0),tree_size(0),tree_depth(0){}
-        Kdtree(const int& _dimension):d_count(0),tree_size(0),tree_depth(0),dimension(_dimension){}
+        Kdtree(const int& _dimension):d_count(0),tree_size(0),tree_depth(0),tree_dimension(_dimension){}
         bool isEmpty(){
             if (!root.get())
                 return true;
@@ -159,18 +159,18 @@ namespace kdtree{
         }
         void insert(vertexPtr& v){
             if(!root.get()){
-                point node_normal(0.0,dimension);
+                point node_normal(0.0,tree_dimension);
                 node_normal[0]=1.0;
                 v->normal=node_normal;
                 root = v; 
-                dimension = root->coord.size();
+                tree_dimension = root->coord.size();
                 tree_size++;
             }
             else{
                 vertexPtr parent; bool side;
                 descend(v->coord, parent, side);
-                point node_normal(0.0,dimension);
-                node_normal[(parent->depth+1)%dimension]=1.0;
+                point node_normal(0.0,tree_dimension);
+                node_normal[(parent->depth+1)%tree_dimension]=1.0;
                 v->normal=node_normal;
                 
                 vertexPtr child = v;
@@ -183,7 +183,7 @@ namespace kdtree{
             if(!root.get()){return R;}
             
             R.depth=0;
-            R.querypoint = qp;
+            //R.querypoint = qp;//TODO necessary?
             R.BPQ.clear();
             R.BPQ.set_size(k);
             query(qp, root, R);      
@@ -227,7 +227,7 @@ namespace kdtree{
             while(bucketRefs.size()>0){
                 bucketPtr current = bucketRefs.front();
                 bucketRefs.pop_front();
-                int d = (current->depth)%dimension;
+                int d = (current->depth)%tree_dimension;
                 std::sort(data.begin()+current->start, data.begin()+current->end, [d](vertexPtr a, vertexPtr b) {return a->coord[d] < b->coord[d];});
                 
                 if(current->end - current->start<2)
@@ -252,6 +252,7 @@ namespace kdtree{
             }
         }
         unsigned int size(){return tree_size;}
+        unsigned int dimension(){return tree_dimension;}
         unsigned int depth(){return tree_depth;}
     };
 }

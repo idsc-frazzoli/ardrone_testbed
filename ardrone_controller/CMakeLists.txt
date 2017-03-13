@@ -20,7 +20,7 @@ include_directories(
  )
 
 catkin_package(
-  INCLUDE_DIRS include include/glc_lib
+  INCLUDE_DIRS include
   CATKIN_DEPENDS roscpp std_msgs sensor_fusion_comm message_runtime
 )
 
