@@ -59,7 +59,8 @@ namespace glc{
     //control grid
     std::deque<vctr> controls;
     //children expanded
-    int sim_count;
+    int sim_count = 0;
+    int coll_check = 0;
     //eta function
     double eta;
     
@@ -181,15 +182,19 @@ namespace glc{
       dynamics->sim(new_traj, current_node->t, current_node->t+expand_time , current_node->x, controls[i]);
       nodePtr new_arc(new node(controls.size()));//Move all this into constructor of new_arc
       new_arc->cost = cf->cost(new_traj, controls[i])+current_node->cost;
-      new_arc->merit = new_arc->cost + h->costToGo(new_arc->x);
+//       std::cout << "1-new arc size " << new_arc->x.size() << std::endl;
+      
       new_arc->u_idx = i;
       new_traj.back(new_arc->x, new_arc->t);
+      new_arc->merit = new_arc->cost + h->costToGo(new_arc->x);//comes after assigning x
+//       std::cout << "2-new arc size " << new_arc->x.size() << std::endl;
       
       traj_from_parent[new_arc] = new_traj;
       
       vctr w = partition_scale * new_arc->x;
       Domain d_new;
       d_new.coordinate = vec_floor( w );
+//       std::cout << "3-new arc size " << new_arc->x.size() << std::endl;
       
       
       // the following yields a reference to either the new domain or the existing one
@@ -197,7 +202,7 @@ namespace glc{
       domains_needing_update.insert(&bucket);
       
       //Add new_arc to the candidates queue for collision checking since it cant be discarded
-      if(new_arc->cost < bucket.label->cost+eps /* and mew_arc->t <= bucket.label->t*/)
+      if(new_arc->cost <= bucket.label->cost+eps /* and mew_arc->t <= bucket.label->t*/)
       {
         bucket.candidates.push(new_arc);//These arcs can potentially get pushed to main Q and even relabel region.
       }     
@@ -239,6 +244,8 @@ namespace glc{
               foundGoal=true;
               live=false;
               std::cout << "\n\nFound goal at iter: " << iter << std::endl;
+              std::cout << "Simulation count: " << dynamics->sim_counter << std::endl;
+              std::cout << "Collision checks: " << obs->collision_counter << std::endl;
               best=curr;
               //TODO not consistent with anything other than min-time cost here
               double tail_cost = traj_from_parent[curr].getDurationFrom(num-1)*
@@ -320,11 +327,7 @@ namespace glc{
       double t0=path[i]->t;
       double tf=t0+expand_time;
       Trajectory arc;
-      std::cout << "t0 " << t0 <<std::endl;
-      std::cout << "tf " << tf << std::endl;
-      std::cout << "path: " << path[i]->x[0] << "," << path[i]->x[1] << "," << path[i]->x[2] << std::endl;
       dynamics->sim(arc, t0, tf, path[i]->x,controls[path[i+1]->u_idx]);
-      print_traj(arc);
       if(i<path.size()-2)
       {
         arc.pop_back();

@@ -6,6 +6,7 @@
 #include <kdtree.h>
 #include <glc_interface.h>
 #include <glc_adapter.h>
+#include <sensor_msgs/PointCloud.h>
 
 //Control input space discretization for the ardrone
 class ControlInputs3D: public glc::Inputs
@@ -40,7 +41,7 @@ public:
 //Collision checking module
 class PointCloudEnvironment : public glc::Obstacles
 {
-  kdtree::Kdtree* kdtree;
+  kdtree::Kdtree* kdtree = nullptr;
   const int dimension = 3;
   const double radius  = 0.2;//20cm radius around quadrotor
   //difference of a n-vector and an m-vector returning a vector of dim min(n,m)
@@ -61,13 +62,14 @@ class PointCloudEnvironment : public glc::Obstacles
   
 public:
   //The pointcloud is 3D 
-  void updatePointCloud(const sensor_msgs::PointCloud& new_point_cloud)//TODO seg faults if point cloud is empty
+  void updatePointCloud(const sensor_msgs::PointCloud& new_point_cloud)
   {
     std::cout << "\nNew Point Cloud Size: " << new_point_cloud.points.size() << std::endl;
     //rebuild kdtree for each new point cloud
     if(kdtree!=nullptr)
       delete kdtree;
     kdtree = new kdtree::Kdtree(3);
+    std::cout << "Created new kdtree of size 0" << std::endl;
     
     //Build kdtree
     clock_t t = clock();
@@ -83,21 +85,26 @@ public:
     kdtree->batchBuild(data);
     
     std::cout << " Built kdtree in " << ((float)(clock()-t))/CLOCKS_PER_SEC << " seconds " << std::endl;
+    std::cout << "Tree size: " << kdtree->size() << std::endl;
   }
-  bool collisionFree(const glc::vctr& state, const double& t)//TODO state will not have the same dimension as kdtree points
-  {
-    glc::vctr query_point(kdtree->dimension());
-    std::copy(std::begin(state),std::begin(state)+kdtree->dimension(),std::begin(query_point));//TODO inefficient
-    //Don't query an empty tree
-    if(kdtree!=nullptr)
-    {
-      if(not kdtree->isEmpty())
-      {
-        
-        kdtree::query_results<kdtree::vertexPtr, kdtree::numT> nearest = kdtree->query(query_point,1);
-        if(kdtree::norm2( nearest.BPQ.queue.top().vtx_ptr->coord - query_point ) < radius)
-          return false;
-      }
+  bool collisionFree(const glc::vctr& state, const double& t){
+    collision_counter++;
+    //If the kdtree has not yet been build cannot collision check
+    if(kdtree==nullptr){
+      return true;
+    }
+    //Can't query an empty tree TODO this should be internal to kdtree
+    if(not kdtree->isEmpty()){
+      glc::vctr query_point(kdtree->dimension());
+      std::copy(std::begin(state),std::begin(state)+kdtree->dimension(),std::begin(query_point));//TODO inefficient?
+//       std::cout << "query point " << query_point[0] << "," << query_point[1] << "," << query_point[2] << std::endl;
+      
+      
+      kdtree::query_results<kdtree::vertexPtr, kdtree::numT> nearest = kdtree->query(query_point,1);
+      glc::vctr result = nearest.BPQ.queue.top().vtx_ptr->coord;
+//       std::cout << "nearest " << result[0] << "," << result[1] << "," << result[2] << std::endl;
+      if(kdtree::norm2( nearest.BPQ.queue.top().vtx_ptr->coord - query_point ) < radius)
+        return false;
     }
     return true;
   }
@@ -117,19 +124,30 @@ public:
   
 };
 
-class ArDroneModel: public glc::EulerIntegrator
+class ArDroneHeuristic : public glc::Heuristic{
+glc::vctr goal;
+double max_velocity = 2.0;//HACK-depends on ARdrone model
+public:
+  ArDroneHeuristic(const glc::vctr& _goal):goal(_goal){}
+//   void setGoal(const glc::vctr& _goal){goal=_goal;}
+  double costToGo(const glc::vctr& state) override {
+    return sqrt( glc::sqr(state[0]-goal[0]) + glc::sqr(state[1]-goal[1]) )/max_velocity;//HACK-depends on cost function
+  }
+  
+};
+
+class ArDroneModel : public glc::EulerIntegrator
 {
 public:
   ArDroneModel(const double& _max_time_step): EulerIntegrator(5,_max_time_step) {}
   
   void flow(glc::vctr& dx, const glc::vctr& x, const glc::vctr& u) override {
     
-    
-    dx[0]=x[3];
-    dx[1]=x[4];
-    dx[2]=0.25*u[2];
-    dx[3]=1.5*u[0];
-    dx[4]=1.5*u[1];
+    dx[0]=x[3];//position in world x-direction
+    dx[1]=x[4];//position in world y-direction
+    dx[2]=0.25*u[2];//position in world z-direction
+    dx[3]=1.5*u[0]-0.75*x[3];//velocity in world x-direction
+    dx[4]=1.5*u[1]-0.75*x[4];//velocity in world y-direction
   }
   
   double getLipschitzConstant() override {
@@ -143,7 +161,7 @@ class RealTimeMotionPlanner
   glc::Parameters parameters;
   glc::DynamicalSystem* dynamic_model;
   glc::CostFunction* performance_objective;
-  glc::Obstacles* obstacles;
+  PointCloudEnvironment obstacles;//TODO it would be nice to have abstract obstacle
   glc::Heuristic* heuristic;
   glc::SphericalGoal* goal;
   glc::Inputs* controls;
@@ -157,19 +175,19 @@ public:
   geometry_msgs::Point p;
   
   
-  RealTimeMotionPlanner():current_state({0.0, 0.0, 2.0, 0.0, 0.0})
+  RealTimeMotionPlanner():current_state({0.0, 0.0, 20.0, 0.0, 0.0})
   {
     parameters.res=8;
     parameters.control_dim = 3;
     parameters.state_dim = 5;
     parameters.depth_scale = 100;
-    parameters.dt_max = 0.2;
+    parameters.dt_max = 0.25;
     parameters.max_iter = 5000;
     parameters.time_scale = 10;
-    parameters.partition_scale = 6.0;
-    parameters.x0 = glc::vctr({0.0,0.0,2.0,0.0,0.0});
+    parameters.partition_scale = 8.0;
+    parameters.x0 = current_state;
     double goal_radius = 2.0;
-    glc::vctr xg({10.0,0.0,2.0,0.0,0.0});
+    glc::vctr xg({10.0,0.0,20.0,0.0,0.0});
     
     dynamic_model = new ArDroneModel(parameters.dt_max);
     controls = new ControlInputs3D(parameters.res);
@@ -178,8 +196,8 @@ public:
     sphericalGoal->setGoal(xg);
     goal = sphericalGoal;
     
-    obstacles = new glc::NoObstacles();
-    heuristic = new glc::ZeroHeuristic();
+//     obstacles = new PointCloudEnvironment();
+    heuristic = new ArDroneHeuristic(xg);
     
     //Visualization stuff
     traj_marker.header.frame_id = "world";
@@ -203,11 +221,17 @@ public:
     return;
   }
   
+  void updateEnvironment(const sensor_msgs::PointCloud& new_point_cloud)
+  {
+    obstacles.updatePointCloud(new_point_cloud);
+  }
+  
   void replan(glc::vctr from_here,glc::vctr to_here)
   {
     parameters.x0=from_here;
     goal->setGoal(to_here);
-    glc::trajectory_planner motion_planner(obstacles, 
+    heuristic->setGoal(to_here);
+    glc::trajectory_planner motion_planner(&obstacles, 
                                            goal, 
                                            dynamic_model, 
                                            heuristic,

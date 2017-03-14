@@ -45,6 +45,7 @@ public:
         {
             if(not kdtree->isEmpty())
             {
+              
                 kdtree::query_results<kdtree::vertexPtr, kdtree::numT> nearest = kdtree->query(query_state,1);
                 if(kdtree::norm2(nearest.BPQ.queue.top().vtx_ptr->coord - query_state)<radius)
                     return false;

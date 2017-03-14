@@ -22,8 +22,10 @@ namespace glc{
     
     class Heuristic
     {
+      vctr goal;
     public: 
-        virtual double costToGo(const vctr& x0)=0; 
+        virtual double costToGo(const vctr& x0)=0;
+        void setGoal(vctr _goal){goal=_goal;}
     }; 
     
     class CostFunction
@@ -62,7 +64,7 @@ namespace glc{
     class Obstacles 
     {
     public:
-        int counter=0;
+        int collision_counter=0;
         //check pointwise for collision    
         virtual bool collisionFree(const Trajectory& x, int* last=NULL)
         { 
