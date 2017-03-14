@@ -172,6 +172,8 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 		tf_listener.lookupTransform( "/ardrone_base_link", "/ardrone_base_frontcam", ros::Time(0), base_link_to_camera_transform);
 		second_keyframe_cam_to_first_keyframe_cam_transform = cvMatToTF(Tcw);
 		
+		odom_to_second_keyframe_base_transform.setOrigin(tf::Vector3(0,0,0));
+		
             } catch ( tf::LookupException e ) {
                 cout << e.what() << endl;
             }
