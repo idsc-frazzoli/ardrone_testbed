@@ -65,13 +65,21 @@ Visualization Manager:
           Value: false
         ardrone_base_link:
           Value: false
-        first_keyframe:
-          Value: true
+        first_keyframe_base_link:
+          Value: false
+        first_keyframe_cam:
+          Value: false
         odom:
           Value: false
         orb_pose_unscaled:
           Value: true
-      Marker Scale: 3
+        orb_pose_unscaled_cam:
+          Value: false
+        second_keyframe_base_link:
+          Value: false
+        second_keyframe_cam:
+          Value: false
+      Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
@@ -83,9 +91,14 @@ Visualization Manager:
               {}
             ardrone_base_frontcam:
               {}
-          first_keyframe:
-            orb_pose_unscaled:
-              {}
+          second_keyframe_base_link:
+            second_keyframe_cam:
+              first_keyframe_cam:
+                first_keyframe_base_link:
+                  {}
+                orb_pose_unscaled_cam:
+                  orb_pose_unscaled:
+                    {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -108,17 +121,17 @@ Visualization Manager:
       Reference Frame: odom
       Value: false
     - Class: rviz/Axes
-      Enabled: true
+      Enabled: false
       Length: 1
       Name: ODOM COSY
       Radius: 0.100000001
       Reference Frame: odom
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
       Color: 255; 85; 255
-      Enabled: false
+      Enabled: true
       Head Diameter: 0.300000012
       Head Length: 0.200000003
       Length: 0.300000012
@@ -135,12 +148,12 @@ Visualization Manager:
       Shaft Length: 0.100000001
       Topic: /trajectory
       Unreliable: false
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: -9999
-        Min Value: 9999
+        Max Value: 0.841750324
+        Min Value: -0.0287141614
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -220,7 +233,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 4.71675301
+      Distance: 3.7944901
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
@@ -234,10 +247,10 @@ Visualization Manager:
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.420203477
+      Pitch: 0.445203483
       Target Frame: ardrone_base_frontcam
       Value: Orbit (rviz)
-      Yaw: 1.42409575
+      Yaw: 5.76727772
     Saved: ~
 Window Geometry:
   Displays:
