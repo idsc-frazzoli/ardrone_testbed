@@ -11,17 +11,23 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
-#include <sensor_fusion_comm/DoubleArrayStamped.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
+//#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
-class ardrone_odometry
+class OdometryIMU
 {
 public:
     geometry_msgs::Vector3 position,velocity,acceleration,acc_avg;//All in world frame alligned with magnetometer
+    
+    // accelerations and magnetic field
+    tf::Vector3 curr_acc, curr_mag;
+    
     double t_now, t_last ,t_start;
     double dt;
     bool first_msg;
     unsigned int count;
+    
+    // calibration transform
+    tf::Transform calib_tf;
     
     tf::TransformListener slam_listener;
     tf::Vector3 slam_pos;
@@ -29,12 +35,10 @@ public:
     tf::Quaternion slam_quat;
     tf::Quaternion imu_quat;
     tf::Quaternion quat_cam_drone;
-    tf::TransformBroadcaster br;
+    //tf::TransformBroadcaster br;
     tf::Transform level;
-    geometry_msgs::PoseWithCovarianceStamped ekf_pose_out_;
-    nav_msgs::Odometry ekf_odom_out_;
     
-    ardrone_odometry():count(0)
+    OdometryIMU():count(0)
     {
         first_msg = true;
         position.x=position.y=position.z=0.0;
@@ -61,6 +65,11 @@ public:
         dt=t_now-t_last;
         tf::quaternionMsgToTF(imu_data.orientation,imu_quat);
         acceleration = bodyToWorldFrame(imu_data.linear_acceleration,imu_data.orientation);
+	
+	// set curr acceleration
+	curr_acc = tf::Vector3(tfScalar(imu_data.linear_acceleration.x), 
+		               tfScalar(imu_data.linear_acceleration.y),
+			       tfScalar(imu_data.linear_acceleration.z));
     }
     
     geometry_msgs::Vector3 bodyToWorldFrame(const geometry_msgs::Vector3& x_body, 
@@ -99,69 +108,68 @@ public:
             ROS_ERROR("%s",ex.what());
         }
     }
-    void broadcast_rel_tf()
+    
+    // TODO test
+    void calibrate(int N, float time)
     {
-        tf::Quaternion r1 = tf::createQuaternionFromRPY(-M_PI/2.0,M_PI/2.0,0.0);
-        tf::Quaternion r2 = tf::createQuaternionFromRPY(0,-M_PI/2,0);
-        tf::Quaternion r3 = tf::createQuaternionFromRPY(0,0,-M_PI/2);
-        
-        quat_cam_drone = r3*r2*r1;
-        
-        tf::Vector3 origin(0.0,0.0,0.0);
-        level.setOrigin(origin);
-        level.setRotation(quat_cam_drone);
-        odom_pos = tf::quatRotate(quat_cam_drone,slam_pos);
-        //br.sendTransform(tf::StampedTransform(level, ros::Time::now(), "/ardrone_base_link", "/level"));
-        
+      tf::Vector3 avg_acc(tfScalar(0),tfScalar(0),tfScalar(0)); // x-axis
+      tf::Vector3 avg_mag(tfScalar(0),tfScalar(0),tfScalar(0)); // z-axis
+      
+      for (int it=0; it<N ; it++)
+      {
+	// wait for imu data to be received
+	ros::spinOnce();
+	// add to average
+	avg_acc += curr_acc * 1.0 / N;
+	avg_mag += curr_mag * 1.0 / N;
+	
+	// wait for next 
+	sleep(time);
+      }
+     
+     // create z axis through cross product
+     tf::Vector3 y_axis = avg_acc.cross(avg_mag);
+     
+     // create a transform tf::Transform from x,y,z axes
+     tf::Matrix3x3 m = tf::Matrix3x3(avg_acc.x(), y_axis.x(), avg_mag.x(), 
+				     avg_acc.y(), y_axis.y(), avg_mag.y(), 
+				     avg_acc.z(), y_axis.z(), avg_mag.z());
+     
+     calib_tf = tf::Transform(m);
+     sleep(2);
     }
     
-    void EKF_callback(sensor_fusion_comm::DoubleArrayStamped msg)
+    void mag_callback(geometry_msgs::Vector3Stamped msg)
     {
-	ekf_pose_out_.pose.pose.position.x = msg.data[0];
-	ekf_pose_out_.pose.pose.position.y = msg.data[1];
-	ekf_pose_out_.pose.pose.position.z = msg.data[2];
-	
-	ekf_pose_out_.pose.pose.orientation.x = msg.data[7];
-	ekf_pose_out_.pose.pose.orientation.y = msg.data[8];
-	ekf_pose_out_.pose.pose.orientation.z = msg.data[9];
-	ekf_pose_out_.pose.pose.orientation.w = msg.data[6];
-	
-	ekf_pose_out_.header.frame_id = "world";
-	ekf_pose_out_.header.stamp = ros::Time::now();
-	
-	ekf_odom_out_.header.stamp = ros::Time::now();
-	ekf_odom_out_.pose.covariance = ekf_pose_out_.pose.covariance;
-	ekf_odom_out_.pose.covariance[1] = 10000;
-	ekf_odom_out_.pose.pose = ekf_pose_out_.pose.pose;
-	ekf_odom_out_.header.frame_id = "world";
-	ekf_odom_out_.child_frame_id = "v_odom";
-	
+      curr_mag = tf::Vector3(tfScalar(msg.vector.x), 
+			     tfScalar(msg.vector.y), 
+			     tfScalar(msg.vector.z));
     }
-    
 };
 
 int main(int argc, char **argv)
 {
     
     ros::init(argc, argv, "controller");
-    ardrone_odometry odometer;
-    ros::NodeHandle n;
+    OdometryIMU od_IMU;
+    ros::NodeHandle nh;
     
-    ros::Subscriber imu_sub = n.subscribe<sensor_msgs::Imu>( "/ardrone/imu", 10,  &ardrone_odometry::imu_msg_callback, &odometer);
-    ros::Subscriber EKF_sub = n.subscribe<sensor_fusion_comm::DoubleArrayStamped>("/ssf_core/state_out", 2, &ardrone_odometry::EKF_callback, &odometer); 
-    ros::Publisher ekf_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/ekf_pose", 2);
-    ros::Publisher ekf_publisher = n.advertise<nav_msgs::Odometry>("/vo",2);
+    // subscribe to magnetic and accelerometer data from imu
+    ros::Subscriber imu_sub = nh.subscribe<sensor_msgs::Imu>( "/ardrone/imu", 10,  &OdometryIMU::imu_msg_callback, &od_IMU);
+    ros::Subscriber mag_sub = nh.subscribe<geometry_msgs::Vector3Stamped>("/ardrone/mag", 10, &OdometryIMU::mag_callback, &od_IMU);
     
-    ros::Rate loop_rate(30);//the received msg is published at 200Hz.
+    
+    ros::Rate loop_rate(30); //the received msg is published at 200Hz.
+    
+    // calibrate imu to align average down direction with positive z
+    int N_samples = 100;
+    od_IMU.calibrate(100, 0.01);
+    
     while (ros::ok())
     {    
-        odometer.get_slam_tf();
-        odometer.broadcast_rel_tf();
+        od_IMU.get_slam_tf();
         ros::spinOnce();
-        
-	ekf_pub.publish(odometer.ekf_pose_out_);
-	ekf_publisher.publish(odometer.ekf_odom_out_);
-	
+      
         loop_rate.sleep();
     }
     
