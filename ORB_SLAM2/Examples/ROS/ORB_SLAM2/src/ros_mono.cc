@@ -51,8 +51,8 @@ class ImageGrabber
 {
 public:
     ImageGrabber ( ORB_SLAM2::System* pSLAM ) :mpSLAM ( pSLAM ), pc() {
-        pc.header.frame_id= "/first_keyframe";
-        pose_out_.header.frame_id = "/odom";
+        pc.header.frame_id= "/first_keyframe_cam";
+        pose_out_.header.frame_id = "odom";
     }
     void GrabImage ( const sensor_msgs::ImageConstPtr& msg );
     geometry_msgs::TransformStamped toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id );
@@ -61,7 +61,7 @@ public:
     ORB_SLAM2::System* mpSLAM;
 
     bool initialized = false;
-    bool debug_mode = false;
+    bool debug_mode = true;
 
     sensor_msgs::PointCloud pc;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
@@ -105,13 +105,9 @@ int main ( int argc, char **argv )
         pose_pub.publish ( igb.pose_out_ );
         loop_rate.sleep();
     }
-
-
+    
     // Stop all threads
     SLAM.Shutdown();
-
-    // Save camera trajectory
-    //SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
 
     ros::shutdown();
 
