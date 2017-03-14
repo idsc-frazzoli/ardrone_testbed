@@ -8,9 +8,6 @@ Panels:
         - /Status1
         - /TF1
         - /TF1/Frames1
-        - /TF1/Tree1
-        - /TF1/Tree1/odom1
-        - /TF1/Tree1/odom1/ardrone_base_link1
       Splitter Ratio: 0.677777767
     Tree Height: 754
   - Class: rviz/Selection
@@ -58,46 +55,13 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        ardrone_base_bottomcam:
-          Value: false
-        ardrone_base_frontcam:
-          Value: false
-        ardrone_base_link:
-          Value: true
-        bA:
-          Value: true
-        bC:
-          Value: false
-        bD:
-          Value: false
-        cA:
-          Value: false
-        cC:
-          Value: false
-        cD:
-          Value: false
-        odom:
-          Value: true
       Marker Scale: 3
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        odom:
-          ardrone_base_link:
-            ardrone_base_bottomcam:
-              {}
-            ardrone_base_frontcam:
-              {}
-          bC:
-            cC:
-              cA:
-                bA:
-                  {}
-                cD:
-                  bD:
-                    {}
+        {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
