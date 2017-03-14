@@ -61,19 +61,19 @@ public:
     ORB_SLAM2::System* mpSLAM;
 
     bool initialized = false;
+    bool debug_mode = false;
 
     sensor_msgs::PointCloud pc;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
 
-    tf::StampedTransform first_keyframe_to_odom_transform;
     tf::TransformListener tf_listener;
 
     tf::TransformBroadcaster br;
     
-    tf::StampedTransform btoc;
-          tf::StampedTransform BtobC;
-	  tf::Transform cCtocA;
-	  tf::StampedTransform rbtoc;
+    tf::StampedTransform base_link_to_camera_transform;
+    tf::StampedTransform odom_to_second_keyframe_base_transform;
+    tf::Transform second_keyframe_cam_to_first_keyframe_cam_transform;
+    tf::StampedTransform base_link_to_camera_transform_no_translation;
 };
 
 int main ( int argc, char **argv )
@@ -171,46 +171,64 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         if ( not initialized ) { // TODO: find first keyframe from first pose by
             //Initialization - set link between 'odom' and 'first_keyframe' frames
           
-  
-	  
 	  try {
-                tf_listener.lookupTransform ( "odom", "/ardrone_base_link", ros::Time ( 0 ), BtobC );
-		tf_listener.lookupTransform( "/ardrone_base_link", "/ardrone_base_frontcam", ros::Time(0), btoc);
-		cCtocA = cvMatToTF(Tcw);
+                tf_listener.lookupTransform ( "odom", "/ardrone_base_link", ros::Time ( 0 ), odom_to_second_keyframe_base_transform );
+		tf_listener.lookupTransform( "/ardrone_base_link", "/ardrone_base_frontcam", ros::Time(0), base_link_to_camera_transform);
+		second_keyframe_cam_to_first_keyframe_cam_transform = cvMatToTF(Tcw);
 		
             } catch ( tf::LookupException e ) {
-                cout << e.what() <<endl;
+                cout << e.what() << endl;
             }
             
-            rbtoc = btoc;
-	    rbtoc.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+            base_link_to_camera_transform_no_translation = base_link_to_camera_transform;
+	    base_link_to_camera_transform_no_translation.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
             
             initialized = true;
         }
 
         //tf::Transform cam_to_first_keyframe_transform = cvMatToTF ( Tcw );
-        tf::Transform cDtocA = cvMatToTF ( Tcw );
-        
-	// B to bC
-	br.sendTransform ( tf::StampedTransform ( BtobC, ros::Time::now(), "odom", "/bC" ) );
-        // bC to cC
-	br.sendTransform ( tf::StampedTransform ( rbtoc, ros::Time::now(), "/bC", "/cC" ) );
-        // cC to cA
-	br.sendTransform ( tf::StampedTransform ( cCtocA.inverse(), ros::Time::now(), "/cC", "/cA" ) );
-        // cA to bA 
-	br.sendTransform ( tf::StampedTransform ( rbtoc.inverse(), ros::Time::now(), "/cA", "/bA" ) );
-	// cA to cD
-	br.sendTransform ( tf::StampedTransform ( cDtocA, ros::Time::now(), "/cA", "/cD" ) );
-	// cD to bD
-	br.sendTransform ( tf::StampedTransform ( rbtoc.inverse(), ros::Time::now(), "/cD", "/bD" ) );
-        /*
+        tf::Transform orb_pose_unscaled_cam_to_first_keyframe_cam = cvMatToTF ( Tcw );
+        ros::Time t = ros::Time::now();
+	
+	if(debug_mode){
+	  // odom to second_keyframe_base_link
+	  br.sendTransform ( tf::StampedTransform ( odom_to_second_keyframe_base_transform, t, "odom", "/second_keyframe_base_link" ) );
+	  
+	  // second_keyframe_base_link to second_keyframe_cam
+	  br.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation, t, "/second_keyframe_base_link", "/second_keyframe_cam" ) );
+	  
+	  // second_keyframe_cam to first_keyframe_cam
+	  br.sendTransform ( tf::StampedTransform ( second_keyframe_cam_to_first_keyframe_cam_transform.inverse(), t, "/second_keyframe_cam", "/first_keyframe_cam" ) );
+	  
+	  // first_keyframe_cam to first_keyframe_base_link 
+	  br.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation.inverse(), t, "/first_keyframe_cam", "/first_keyframe_base_link" ) );
+	  
+	  // first_keyframe_cam to orb_pose_unscaled_cam
+	  br.sendTransform ( tf::StampedTransform ( orb_pose_unscaled_cam_to_first_keyframe_cam, t, "/first_keyframe_cam", "/orb_pose_unscaled_cam" ) );
+	  
+	  // orb_pose_unscaled_cam to orb_pose_unscaled
+	  br.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation.inverse(), t, "/orb_pose_unscaled_cam", "/orb_pose_unscaled" ) );
+	}
+	else{
+	  tf::Transform output = odom_to_second_keyframe_base_transform
+					*base_link_to_camera_transform_no_translation
+					*second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
+					*base_link_to_camera_transform_no_translation.inverse();
+	  br.sendTransform (tf::StampedTransform ( output , t, "odom", "/first_keyframe_base_link" ) );
+	}
+	  
+	tf::Transform pose_out = odom_to_second_keyframe_base_transform
+				 *base_link_to_camera_transform_no_translation
+				 *second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
+				 *orb_pose_unscaled_cam_to_first_keyframe_cam
+				 *base_link_to_camera_transform_no_translation.inverse();
 
-        generate pose for robot_localization EKF sensor fusion
-        the pose is simply generated from the above derived transformations
+        //generate pose for robot_localization EKF sensor fusion
+        //the pose is simply generated from the above derived transformations
         pose_out_.header.stamp = t;
 
-        tf::Quaternion pose_orientation = pose_out_corrected.getRotation();
-        tf::Vector3 pose_origin = pose_out_corrected.getOrigin();
+        tf::Quaternion pose_orientation = pose_out.getRotation();
+        tf::Vector3 pose_origin = pose_out.getOrigin();
         pose_out_.pose.pose.orientation.x = pose_orientation.getX();
         pose_out_.pose.pose.orientation.y = pose_orientation.getY();
         pose_out_.pose.pose.orientation.z = pose_orientation.getZ();
@@ -220,7 +238,7 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         pose_out_.pose.pose.position.z = pose_origin.getZ();
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////77
-        TODO: Set covariance
+        //TODO: Set covariance
         /////////////////////////////////////////////////////////////////////////////////////////////////////////
         for ( auto& x:pose_out_.pose.covariance ) {
             x = 0.0;
@@ -231,7 +249,7 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
         pose_out_.pose.covariance[14] = 1;
         pose_out_.pose.covariance[21] = 1;
         pose_out_.pose.covariance[28] = 1;
-        pose_out_.pose.covariance[35] = 1;*/
+        pose_out_.pose.covariance[35] = 1;
     }
 
     // gets points from most recent frame
