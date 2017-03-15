@@ -30,9 +30,10 @@ endif()
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake_modules)
 
-find_package(OpenCV 3.0 QUIET)
+find_package(OpenCV 3.2)
 if(NOT OpenCV_FOUND)
-   find_package(OpenCV 2.4.3 QUIET)
+	message("Open CV 3 not found")
+   find_package(OpenCV 2.4.3)
    if(NOT OpenCV_FOUND)
       message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
    endif()
@@ -67,6 +68,8 @@ ${LIBS}
 )
 
 # Node for monocular camera (Augmented Reality Demo)
+
+
 #rosbuild_add_executable(MonoAR
 #src/AR/ros_mono_ar.cc
 #src/AR/ViewerAR.h
@@ -78,20 +81,20 @@ ${LIBS}
 #)
 
 # Node for stereo camera
-rosbuild_add_executable(Stereo
-src/ros_stereo.cc
-)
+#rosbuild_add_executable(Stereo
+#src/ros_stereo.cc
+#)
 
-target_link_libraries(Stereo
-${LIBS}
-)
+#target_link_libraries(Stereo
+#${LIBS}
+#)
 
 # Node for RGB-D camera
-rosbuild_add_executable(RGBD
-src/ros_rgbd.cc
-)
+#rosbuild_add_executable(RGBD
+#src/ros_rgbd.cc
+#)
 
-target_link_libraries(RGBD
-${LIBS}
-)
+#target_link_libraries(RGBD
+#${LIBS}
+#)
 
