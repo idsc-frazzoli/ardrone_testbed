@@ -47,6 +47,6 @@ ORBvoc.txt
 #ide files
 *.kdev4
 
-ORB_SLAM2/build\.sh
+ORB_SLAM2/build.sh
 
-ORB_SLAM2/build_ros\.sh
+ORB_SLAM2/build_ros.sh
