@@ -101,9 +101,11 @@ int main ( int argc, char **argv )
 
     while ( ros::ok() ) {
         ros::spinOnce();
-        pc_pub.publish ( igb.pc );
+	if (igb.initialized) {
+	  pc_pub.publish ( igb.pc );
         pose_pub.publish ( igb.pose_out_ );
-        loop_rate.sleep();
+    }
+	loop_rate.sleep();
     }
     
     // Stop all threads

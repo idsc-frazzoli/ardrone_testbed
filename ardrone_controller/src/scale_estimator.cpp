@@ -21,22 +21,22 @@ public:
 
     tf::Quaternion orb_orientation;
 
+    bool nav_init, orb_init;
+    
     tf::TransformListener tf_listener;
 
     int32_t curr_altd;
     tf::Vector3 curr_orb_position; 
     
-    ScaleEstimator() {
-       nav_data_displacement = orb_displacement = tf::Vector3(0,0,0);
-    }
 
     void nav_data_callback ( ardrone_autonomy::Navdata msg ) {
+      if (not nav_init) nav_init = true;
       
         ros::Duration dt = ros::Time::now() - msg.header.stamp;
 	cout << "navdata callback with msg at time " << msg.header.stamp << " now " << ros::Time::now() <<  " delay is " << dt.toSec() << endl;
 
 	tf::StampedTransform base_link_to_odom;
-        tf_listener.lookupTransform ( "/ardrone_base_link", "odom", msg.header.stamp, base_link_to_odom );
+        tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time(0), base_link_to_odom );
 
         float dx = msg.vx * dt.toSec() / 1000;
         float dy = msg.vy * dt.toSec() / 1000;
@@ -53,6 +53,8 @@ public:
     }
     
     void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
+      if (not orb_init) orb_init = true;
+      
       ros::Duration dt = ros::Time::now()-msg.header.stamp;
       cout << "orb callback with msg from " << msg.header.stamp << " delay is " << dt.toSec() << endl; 
 	tf::Vector3 orb_position = tf::Vector3(msg.pose.pose.position.x, 
@@ -67,10 +69,11 @@ public:
       
     }
 
-    void reset_nav_data_pose() {
+    void reset_all() {
       cout << "====================== reset ====================" << endl;
         nav_data_displacement = tf::Vector3 ( 0.0, 0.0, 0.0 );
 	orb_displacement = tf::Vector3 (0.0, 0.0, 0.0 );
+	nav_init = orb_init = false;
     }
 	    
     geometry_msgs::PoseWithCovarianceStamped get_scaled_pose() {
@@ -110,6 +113,12 @@ public:
             scale = ( sxx - syy + copysign ( 1.0, sxy ) * sqrt ( pow ( sxx - syy,2 ) + 4*pow ( sxy,2 ) ) ) / ( 2*nav_noise / orb_noise * sxy );
             cout << "scale: " << scale << endl;
         }
+        
+        bool ready()
+	{
+	  cout << orb_init << " " << nav_init << endl;
+	  return orb_init && nav_init;
+	}
 
     };
 
@@ -131,17 +140,29 @@ public:
 	int rate = 5;
         ros::Rate loop_rate ( rate );
 	cout << "Started scale estimation with rate " << rate << endl; 
-
+	
+	scale_est.reset_all();
+	
         while ( ros::ok() ) {
             // work through all messages received
+	    cout << "***************Working on messages***************" << endl;
             ros::spinOnce();
+	    cout << "***************Finished working on messages***************" << endl;
 	    
-	    if (scale_est.orb_displacement.isZero() or scale_est.nav_data_displacement.isZero()) continue;
+	    if (not scale_est.ready()) {
+	      cout << " Not ready!" << endl;
+	      loop_rate.sleep();
+	      scale_est.reset_all();
+	      continue; 
+	      
+	    }
 
             // estimate new scale with new poses
             scale_est.update_scale();
             geometry_msgs::PoseWithCovarianceStamped scaled_orb_pose = scale_est.get_scaled_pose();
-
+	    
+	    scale_est.reset_all();
+	    
             // TODO: debug
             std_msgs::Float32 scale = scale_est.get_scale();
             cout << "SCALE: " << scale << endl;
