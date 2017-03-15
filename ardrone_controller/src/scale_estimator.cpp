@@ -1,3 +1,5 @@
+#include <queue>
+
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
@@ -28,33 +30,34 @@ public:
     int32_t curr_altd;
     tf::Vector3 curr_orb_position; 
     
-
-    void nav_data_callback ( ardrone_autonomy::Navdata msg ) {
-      if (not nav_init) nav_init = true;
-      
-        ros::Duration dt = ros::Time::now() - msg.header.stamp;
-	cout << "navdata callback with msg at time " << msg.header.stamp << " now " << ros::Time::now() <<  " delay is " << dt.toSec() << endl;
-
-	tf::StampedTransform base_link_to_odom;
-        tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time(0), base_link_to_odom );
-
-        float dx = msg.vx * dt.toSec() / 1000;
-        float dy = msg.vy * dt.toSec() / 1000;
-        float dz = ( msg.altd - curr_altd ) / 1000 ;
-
-        curr_altd = msg.altd;
-
-        tf::Vector3 displacement_odom = base_link_to_odom ( tf::Vector3 ( dx,dy,dz ) );
-	
-	nav_data_displacement += displacement_odom;
-    cout << "current displacement is " << nav_data_displacement.getX() << " " <<nav_data_displacement.getY() << " "<<nav_data_displacement.getZ() << endl;
-      
-
-    }
+    queue<ardrone_autonomy::Navdata> nav_data_queue;
+    queue<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
     
-    void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
-      if (not orb_init) orb_init = true;
-      
+
+//     {
+//       
+//         ros::Duration dt = ros::Time::now() - msg.header.stamp;
+// 	cout << "navdata callback with msg at time " << msg.header.stamp << " now " << ros::Time::now() <<  " delay is " << dt.toSec() << endl;
+// 
+// 	tf::StampedTransform base_link_to_odom;
+//         tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time(0), base_link_to_odom );
+// 
+//         float dx = msg.vx * dt.toSec() / 1000;
+//         float dy = msg.vy * dt.toSec() / 1000;
+//         float dz = ( msg.altd - curr_altd ) / 1000 ;
+// 
+//         curr_altd = msg.altd;
+// 
+//         tf::Vector3 displacement_odom = base_link_to_odom ( tf::Vector3 ( dx,dy,dz ) );
+// 	
+// 	nav_data_displacement += displacement_odom;
+//     cout << "current displacement is " << nav_data_displacement.getX() << " " <<nav_data_displacement.getY() << " "<<nav_data_displacement.getZ() << endl;
+//       
+// 
+//     }
+//     
+
+    /*
       ros::Duration dt = ros::Time::now()-msg.header.stamp;
       cout << "orb callback with msg from " << msg.header.stamp << " delay is " << dt.toSec() << endl; 
 	tf::Vector3 orb_position = tf::Vector3(msg.pose.pose.position.x, 
@@ -67,13 +70,12 @@ public:
 					 msg.pose.pose.orientation.z, msg.pose.pose.orientation.w);
       cout << "current displacement is " << orb_displacement.getX() << " " <<orb_displacement.getY() << " "<<orb_displacement.getZ() << endl;
       
-    }
+    }*/
 
     void reset_all() {
       cout << "====================== reset ====================" << endl;
         nav_data_displacement = tf::Vector3 ( 0.0, 0.0, 0.0 );
 	orb_displacement = tf::Vector3 (0.0, 0.0, 0.0 );
-	nav_init = orb_init = false;
     }
 	    
     geometry_msgs::PoseWithCovarianceStamped get_scaled_pose() {
@@ -119,9 +121,141 @@ public:
 	  cout << orb_init << " " << nav_init << endl;
 	  return orb_init && nav_init;
 	}
+	
+	
+  void process_queue()
+  {
+    ros::Time t_oldest, t_newest;
+    ardrone_autonomy::Navdata curr_msg, old_msg;
+    tf::StampedTransform old_base_link_to_odom, new_base_link_to_odom;
+     
+    // process orb
+    if (orb_data_queue.empty())
+    {
+      orb_init = false;//do smth
+      return;
+    } else {
+    
+      orb_init = true;
+      
+      geometry_msgs::PoseWithCovarianceStamped * newest_orb_msg = orb_data_queue.back();
+      geometry_msgs::PoseWithCovarianceStamped * oldest_orb_msg = orb_data_queue.front();
+      
+      t_oldest = oldest_orb_msg->header.stamp;
+      t_newest = newest_orb_msg->header.stamp;
+      
+      double dx, dy, dz;
+      dx = newest_orb_msg->pose.pose.position.x - oldest_orb_msg->pose.pose.position.x; 
+      dy = newest_orb_msg->pose.pose.position.y - oldest_orb_msg->pose.pose.position.y; 
+      dz = newest_orb_msg->pose.pose.position.z - oldest_orb_msg->pose.pose.position.z; 
+      
+      orb_displacement = tf::Vector3(dx,dy,dz);    
+    }
+    
+    
+    // process nav data
+   if (nav_data_queue.empty())
+    {
+      nav_init = false;//do smth
+      return;
+    } else {
+    
+      nav_init = true;
+      
+      
+      while (!nav_data_queue.empty())
+      {
+	ardrone_autonomy::Navdata curr_msg = nav_data_queue.pop();
+	
+	if (curr_msg.header.stamp.toSec() < old_msg.header.stamp.toSec())
+	{
+	  old_msg = curr_msg;
+	  continue;
+	} else {
+	
+	  ros::Duration dt = curr_msg.header.stamp.toSec() - old_msg.header.stamp.toSec();
+	  
+	  try {
+	  tf_listener.lookupTransform ( "/ardrone_base_link", "odom", old_msg.header.stamp, old_base_link_to_odom );
+	  tf_listener.lookupTransform ( "/ardrone_base_link", "odom", curr_msg.header.stamp, new_base_link_to_odom );
+	  
+	    
+	  } catch (tf::LookupException e) {
+	   tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time(0), old_base_link_to_odom );
+	   tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time(0), new_base_link_to_odom );
+	   
+	   cout << e.what() << endl;
+	  }
+	  
+	  tf::Matrix3x3 R = old_base_link_to_odom.getBasis();
+	  
+	  tf::Vector3 old_altd = old_base_link_to_odom(tf::Vector3(0,0,old_msg.altd));
+	  tf::Vector3 new_altd = new_base_link_to_odom(tf::Vector3(0,0,curr_msg.altd));
+	  
+	  double dz = new_altd[2] - new_altd[2];  
+	  
+	  if (curr_msg.header.stamp.toSec() > t_newest.toSec())
+	  {
+	    dz = dz * (t_newest.toSec() - old_msg.header.stamp.toSec()) / dt.toSec();
+	    double v_z = (dz/dt.toSec() - R[2][0] * old_msg.vx - R[2][1] * old_msg.vy ) / R[2][2]; 
+	 
+	    nav_data_displacement += dt.toSec() * R * tf::Vector3(old_msg.vx,old_msg.vy,v_z);
+	    break;
+	  } else {
+	  
+	  double v_z = (dz/dt.toSec() - R[2][0] * old_msg.vx - R[2][1] * old_msg.vy ) / R[2][2]; 
+	 
+	  nav_data_displacement += dt.toSec() * R * tf::Vector3(old_msg.vx,old_msg.vy,v_z);
+	  
+	  
+	  old_msg = curr_msg;
 
-    };
+      }
+       
+      
+      
+      geometry_msgs::PoseWithCovarianceStamped * newest_orb_msg = orb_data_queue.back();
+      geometry_msgs::PoseWithCovarianceStamped * oldest_orb_msg = orb_data_queue.front();
+      
+      ros::Time t_old = oldest_orb_msg->header.stamp;
+      ros::Time t_new = newest_orb_msg->header.stamp;
+      
+      double dx, dy, dz;
+      dx = newest_orb_msg->pose.pose.position.x - oldest_orb_msg->pose.pose.position.x; 
+      dy = newest_orb_msg->pose.pose.position.y - oldest_orb_msg->pose.pose.position.y; 
+      dz = newest_orb_msg->pose.pose.position.z - oldest_orb_msg->pose.pose.position.z; 
+      
+      orb_displacement = tf::Vector3(dx,dy,dz);    
+    }
+    
+    
+    
+    
+    
+    
+  }
 
+  void publish_scale(ros::Publisher &publisher)
+    {
+      if (orb_init && nav_init)  publisher.publish ( scale );
+    }
+    
+  void publish_scaled_pose(ros::Publisher &publisher)
+    {
+      if (orb_init && nav_init) publisher.publish ( pose );
+    }
+  
+  void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
+      orb_data_queue.push(msg);
+    }
+    
+  void nav_data_callback ( ardrone_autonomy::Navdata msg ) {
+	nav_data_queue.push(msg);
+    }
+  
+};
+    
+    
     int main ( int argc, char **argv ) {
         ros::init ( argc, argv, "scale_estimator" );
         ros::NodeHandle nh;
@@ -145,33 +279,28 @@ public:
 	
         while ( ros::ok() ) {
             // work through all messages received
-	    cout << "***************Working on messages***************" << endl;
+	    cout << "***************Storing messages***************" << endl;
             ros::spinOnce();
-	    cout << "***************Finished working on messages***************" << endl;
+	    cout << "***************Finished storing messages***************" << endl;
 	    
-	    if (not scale_est.ready()) {
-	      cout << " Not ready!" << endl;
-	      loop_rate.sleep();
-	      scale_est.reset_all();
-	      continue; 
-	      
-	    }
-
-            // estimate new scale with new poses
-            scale_est.update_scale();
-            geometry_msgs::PoseWithCovarianceStamped scaled_orb_pose = scale_est.get_scaled_pose();
+	    scale_est.process_queue();
+	    
+	    scale_est.publish_scale(orb_scale_pub);
+	    scale_est.publish_scaled_pose(filt_orb_pub);
+	    
 	    
 	    scale_est.reset_all();
 	    
             // TODO: debug
             std_msgs::Float32 scale = scale_est.get_scale();
+	    geometry_msgs::PoseWithCovarianceStamped scaled_orb_pose = scale_est.get_scaled_pose();
+	    
             cout << "SCALE: " << scale << endl;
             cout << "SCALED POSE: " << scaled_orb_pose.pose.pose.position.x << " "
                  << scaled_orb_pose.pose.pose.position.y << " "
                  << scaled_orb_pose.pose.pose.position.z << endl;
+	   // debug
 
-            filt_orb_pub.publish ( scaled_orb_pose );
-            orb_scale_pub.publish ( scale );
 
             loop_rate.sleep();
         }
