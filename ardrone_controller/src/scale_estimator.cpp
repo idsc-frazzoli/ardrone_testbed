@@ -25,11 +25,17 @@ public:
 
     int32_t curr_altd;
     tf::Vector3 curr_orb_position; 
+    
+    ScaleEstimator() {
+       nav_data_displacement = orb_displacement = tf::Vector3(0,0,0);
+    }
 
     void nav_data_callback ( ardrone_autonomy::Navdata msg ) {
-
+      
         ros::Duration dt = ros::Time::now() - msg.header.stamp;
-	tf::Transform base_link_to_odom;
+	cout << "navdata callback with msg at time " << msg.header.stamp << " now " << ros::Time::now() <<  " delay is " << dt.toSec() << endl;
+
+	tf::StampedTransform base_link_to_odom;
         tf_listener.lookupTransform ( "/ardrone_base_link", "odom", msg.header.stamp, base_link_to_odom );
 
         float dx = msg.vx * dt.toSec() / 1000;
@@ -41,21 +47,30 @@ public:
         tf::Vector3 displacement_odom = base_link_to_odom ( tf::Vector3 ( dx,dy,dz ) );
 	
 	nav_data_displacement += displacement_odom;
+    cout << "current displacement is " << nav_data_displacement.getX() << " " <<nav_data_displacement.getY() << " "<<nav_data_displacement.getZ() << endl;
+      
 
     }
     
     void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
+      ros::Duration dt = ros::Time::now()-msg.header.stamp;
+      cout << "orb callback with msg from " << msg.header.stamp << " delay is " << dt.toSec() << endl; 
 	tf::Vector3 orb_position = tf::Vector3(msg.pose.pose.position.x, 
 						msg.pose.pose.position.y, 
 						msg.pose.pose.position.z);
 	
 	orb_displacement += orb_position - curr_orb_position;
 	curr_orb_position = orb_position;
+	orb_orientation = tf::Quaternion(msg.pose.pose.orientation.x, msg.pose.pose.orientation.y,
+					 msg.pose.pose.orientation.z, msg.pose.pose.orientation.w);
+      cout << "current displacement is " << orb_displacement.getX() << " " <<orb_displacement.getY() << " "<<orb_displacement.getZ() << endl;
+      
     }
 
     void reset_nav_data_pose() {
-        nav_data_displacement = tf::Vector3 ( 0f, 0f, 0f );
-	orb_displacement = tf::Vector3 ( 0f, 0f, 0f );
+      cout << "====================== reset ====================" << endl;
+        nav_data_displacement = tf::Vector3 ( 0.0, 0.0, 0.0 );
+	orb_displacement = tf::Vector3 (0.0, 0.0, 0.0 );
     }
 	    
     geometry_msgs::PoseWithCovarianceStamped get_scaled_pose() {
@@ -65,9 +80,12 @@ public:
             pose_out.pose.pose.position.y = curr_orb_position.y() / scale;
             pose_out.pose.pose.position.z = curr_orb_position.z() / scale;
 
-            pose_out.pose.pose.orientation = tf2::toMsg ( orb_orientation );
+            pose_out.pose.pose.orientation.x = orb_orientation.getX();
+	    pose_out.pose.pose.orientation.y = orb_orientation.getY();
+	    pose_out.pose.pose.orientation.z = orb_orientation.getZ();
+	    pose_out.pose.pose.orientation.w = orb_orientation.getW();
 
-            pose_out.header.frame_id = "odom;
+            pose_out.header.frame_id = "odom";
 
             pose_out.header.stamp = ros::Time::now();
 
@@ -109,12 +127,16 @@ public:
         // publish scale and filtered orb pose
         ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled",2 );
         ros::Publisher orb_scale_pub = nh.advertise<std_msgs::Float32> ( "/orb/scale", 2 );
-
-        ros::Rate loop_rate ( 5 );
+	
+	int rate = 5;
+        ros::Rate loop_rate ( rate );
+	cout << "Started scale estimation with rate " << rate << endl; 
 
         while ( ros::ok() ) {
             // work through all messages received
             ros::spinOnce();
+	    
+	    if (scale_est.orb_displacement.isZero() or scale_est.nav_data_displacement.isZero()) continue;
 
             // estimate new scale with new poses
             scale_est.update_scale();
@@ -122,8 +144,8 @@ public:
 
             // TODO: debug
             std_msgs::Float32 scale = scale_est.get_scale();
-            cout << "Scale: " << scale << endl;
-            cout << "Filtered Pose: " << scaled_orb_pose.pose.pose.position.x << " "
+            cout << "SCALE: " << scale << endl;
+            cout << "SCALED POSE: " << scaled_orb_pose.pose.pose.position.x << " "
                  << scaled_orb_pose.pose.pose.position.y << " "
                  << scaled_orb_pose.pose.pose.position.z << endl;
 
