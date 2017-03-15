@@ -117,7 +117,8 @@ namespace glc{
       //eps(R)
       if(cf->getLipschitzConstant()>0)
       {
-        eps = (sqrt(params.state_dim)/partition_scale)*
+        //stronger glc conditions make eps unnecessary
+        eps = 0.0*(sqrt(params.state_dim)/partition_scale)*
         (dynamics->getLipschitzConstant())/(cf->getLipschitzConstant())*
         (params.res*exp(dynamics->getLipschitzConstant())-1.0);
       }
@@ -164,6 +165,22 @@ namespace glc{
     nodePtr current_node = queue.top();
     queue.pop();
     
+    //Goal checking
+    if(goal->inGoal(current_node->x,current_node->t) and current_node->cost < best->cost)
+    {
+      run_time = clock() - tstart; 
+      foundGoal=true;
+      best=current_node;
+      live=false;
+      UPPER=current_node->cost;
+      std::cout << "\nFound goal at iter: " << iter << std::endl;
+      std::cout << "      Running time: " << run_time << std::endl;
+      std::cout << "  Simulation count: " << dynamics->sim_counter << std::endl;
+      std::cout << "  Collision checks: " << obs->collision_counter << std::endl;
+      std::cout << "    Cost from root: " << current_node->cost << std::endl;
+      return;
+    }   
+    
     if(current_node->depth >=depth_limit or iter>params.max_iter)
     {
       std::cout << "---exceeded depth or iteration limit---" << std::endl;
@@ -202,7 +219,7 @@ namespace glc{
       domains_needing_update.insert(&bucket);
       
       //Add new_arc to the candidates queue for collision checking since it cant be discarded
-      if(new_arc->cost <= bucket.label->cost+eps /* and mew_arc->t <= bucket.label->t*/)
+      if(new_arc->merit <= bucket.label->merit/* and mew_arc->t <= bucket.label->t*/)
       {
         bucket.candidates.push(new_arc);//These arcs can potentially get pushed to main Q and even relabel region.
       }     
@@ -218,7 +235,7 @@ namespace glc{
       while( not current_domain.candidates.empty())
       {
         //Check that the top of the domain's candidate queue is within the current threshold
-        if(current_domain.candidates.top()->cost < current_domain.label->cost+eps){
+        if(current_domain.candidates.top()->merit < current_domain.label->merit){
           //                 if(current_domain.candidates.top()->merit < current_domain.label->merit+eps){
           
           const nodePtr& curr = current_domain.candidates.top(); 
@@ -237,7 +254,7 @@ namespace glc{
               current_domain.label = curr;
             }
             
-            //Goal checking
+/*            //Goal checking
             if(goal->inGoal(traj_from_parent[curr],&num) and curr->cost < best->cost)
             {
               run_time = clock() - tstart; // TODO 
@@ -255,7 +272,7 @@ namespace glc{
               std::cout << "          End time: " <<  traj_from_parent[curr].getEndTime() << std::endl;
               UPPER=curr->cost-tail_cost;
               
-            }    
+            }   */ 
           }
           
         }

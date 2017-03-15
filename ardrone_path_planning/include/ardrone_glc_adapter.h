@@ -200,7 +200,7 @@ public:
     heuristic = new ArDroneHeuristic(xg);
     
     //Visualization stuff
-    traj_marker.header.frame_id = "world";
+    traj_marker.header.frame_id = "odom";
     traj_marker.ns = "trajectory_visualisation";
     traj_marker.id = 2;
     traj_marker.type = visualization_msgs::Marker::CUBE_LIST;
@@ -240,7 +240,6 @@ public:
                                            controls->points);
     motion_planner.plan(out);
     glc::print_traj(current_plan);
-    std::cout << "GLC running time: " << out.time << std::endl;
     current_plan = motion_planner.recover_traj( motion_planner.path_to_root(true) );
     
     //Send Trajectory markers to rviz

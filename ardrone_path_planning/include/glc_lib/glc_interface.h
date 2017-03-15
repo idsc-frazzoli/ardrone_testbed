@@ -46,6 +46,7 @@ namespace glc{
     {
         
     public:
+        virtual bool inGoal(const glc::vctr& x, const double& t)=0;
         virtual bool inGoal(const Trajectory& x, int* last=NULL)
         { 
             for(int i=0;i<x.size();i++) {
@@ -58,7 +59,6 @@ namespace glc{
             return false;
         }
         
-        virtual bool inGoal(const glc::vctr& x, const double& t)=0;
     };
     
     class Obstacles 
