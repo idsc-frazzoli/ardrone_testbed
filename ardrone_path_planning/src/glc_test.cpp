@@ -15,15 +15,24 @@ class ControlInputs2D: public glc::Inputs
   
 public:
   //uniformly spaced points on a circle
-  ControlInputs3D(int num_inputs)
+  ControlInputs2D(int num_inputs)
   {
     glc::vctr u(3);
       for(int i=0;i<num_inputs;i++){
         u[0]=sin(2.0*i*M_PI/num_inputs);
         u[1]=cos(2.0*i*M_PI/num_inputs);
         addInputSample(u);
-        std::cout << "Control[" << i << "]=(" << u[0] << "," << u[1] ")" << std::endl;
+        std::cout << "Control[" << i << "]=(" << u[0] << "," << u[1] << ")" << std::endl;
     }
+  }
+};
+
+class EuclideanHeuristic : public glc::Heuristic
+{
+public:
+  EuclideanHeuristic(glc::vctr& _goal){goal=_goal;}
+  double costToGo(const glc::vctr& state){
+    return std::max(0.0,sqrt(glc::sqr(goal[0]-state[0])+glc::sqr(goal[1]-state[1]))-1.01);//offset by goal radius
   }
 };
 
@@ -36,16 +45,16 @@ int main()
     alg_params.state_dim = 2;
     alg_params.depth_scale = 100;
     alg_params.dt_max = 0.2;
-    alg_params.max_iter = 20000;
-    alg_params.time_scale = 6;
-    alg_params.partition_scale = 1.5;
-    alg_params.x0.push_back(0.0);alg_params.x0.push_back(0.0);
+    alg_params.max_iter = 10000;
+    alg_params.time_scale = 8;
+    alg_params.partition_scale = 10;
+    alg_params.x0 = glc::vctr({0.0,0.0});
     
     //Create a dynamic model
-    glc::SingleIntegrator dynamic_model(alg_params.state_dim);
+    glc::SingleIntegrator dynamic_model(alg_params.state_dim,alg_params.dt_max);
     
     //Create the control inputs
-    ControlInputs2D controls(alg_params.res,alg_params.control_dim);
+    ControlInputs2D controls(alg_params.res);
     
     //Create the cost function
     glc::MinTimeCost performance_objective;
@@ -55,15 +64,15 @@ int main()
     //create goal object
     glc::SphericalGoal goal(alg_params.state_dim,goal_radius);
     //set goal location
-    std::vector<double> xg({10.0,10.0});
+    glc::vctr xg({10.0,10.0});
     goal.setGoal(xg);
     
     //Create the obstacles
     glc::NoObstacles obstacles;
     
     //Create a heuristic for the current goal
-    zero_heuristic heuristic(goal.getGoal(),goal.getRadius());
-    
+//     glc::ZeroHeuristic heuristic;
+    EuclideanHeuristic heuristic(xg);
     glc::GLCPlanner planner(&obstacles,
                                      &goal,
                                      &dynamic_model,
@@ -76,6 +85,6 @@ int main()
     planner.Plan(out);
     std::cout << "running time " << out.time << std::endl; 
     //Dig out the solution and print it
-    glc::printTraj( planner.recover_traj( planner.path_to_root(true) ) );
+    glc::printTraj( planner.recoverTraj( planner.pathToRoot(true) ) );
     return 0;
 }

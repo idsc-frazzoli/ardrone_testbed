@@ -22,6 +22,7 @@ namespace glc{
     
     class Heuristic
     {
+    protected:
       vctr goal;
     public: 
         virtual double costToGo(const vctr& x0)=0;
@@ -30,6 +31,7 @@ namespace glc{
     
     class CostFunction
     {
+    protected:
         const double lipschitz_constant;
     public:
         CostFunction(double _lipschitz_constant):lipschitz_constant(_lipschitz_constant){}
@@ -42,12 +44,10 @@ namespace glc{
         }
     };
     
-    class GoalRegion
-    {
+    class GoalRegion{
         
     public:
-        virtual bool inGoal(const Trajectory& x, int* last=NULL)
-        { 
+        virtual bool inGoal(const Trajectory& x, int* last=NULL){ 
             for(int i=0;i<x.size();i++) {
                 if(inGoal(x.getState(i), x.getTime(i))){
                     if(last)
@@ -61,16 +61,13 @@ namespace glc{
         virtual bool inGoal(const glc::vctr& x, const double& t)=0;
     };
     
-    class Obstacles 
-    {
+    class Obstacles{
     public:
         int collision_counter=0;
         //check pointwise for collision    
-        virtual bool collisionFree(const Trajectory& x, int* last=NULL)
-        { 
+        virtual bool collisionFree(const Trajectory& x, int* last=NULL){ 
             for(int i=0;i<x.size();i++) {
-                if(not collisionFree(x.getState(i), x.getTime(i)))
-                {
+                if(not collisionFree(x.getState(i), x.getTime(i))){
                     if(last)
                         *last = i;
                     return false;
@@ -80,19 +77,14 @@ namespace glc{
         }
         
         virtual bool collisionFree(const glc::vctr& x, const double& t)=0;
-        
-        
     };
     
 
     
     //Vector field with numerical integration
-    class DynamicalSystem
-    {
+    class DynamicalSystem{
     public:
-        //maximum time step
         const double max_time_step;
-        //usage counter
         int sim_counter=0;
         
         DynamicalSystem(double _max_time_step):max_time_step(_max_time_step){}
@@ -104,41 +96,26 @@ namespace glc{
         //Forward integration step
         virtual void step(vctr& x_plus, const vctr& x, const vctr& u, const double dt)=0;
         
-        
-        void sim(glc::Trajectory& sol, double t0, double tf, const vctr& x0, const vctr& u)
-        {
+        void sim(glc::Trajectory& sol, double t0, double tf, const vctr& x0, const vctr& u){
             assert(tf>t0);
             
             //compute minimum number of steps to satisfy dt<dt_max
             double num_steps=ceil((tf-t0)/max_time_step);
             double dt=(tf-t0)/num_steps;
             //resize solution
-//             sol.resize(num_steps+1);
             sol.reserve(num_steps+1);
             //set initial condition
-            //sol.setState(x0);
-//             sol.set(0, x0, t0);
             sol.push_back(x0,t0);
             vctr x1;
             //integrate
-            for(int i=0;i<num_steps;i++)
-            {
+            for(int i=0;i<num_steps;i++){
                 step(x1,sol.getState(i),u,dt);
                 sol.push_back(x1, sol.getTime(i)+dt);
             }
             sim_counter++;
             return;
         }
-        
-//         //integrate forward for tspan from x0 with constant u
-//         Trajectory sim(double t0, double tf, const vctr& x0, const vctr& u)
-//         {
-//             Trajectory sol;
-//             sim(sol, t0, tf, x0, u);
-//             
-//             return sol;
-//         }
-        
+                
     };
     
     class EulerIntegrator : public DynamicalSystem
@@ -188,7 +165,7 @@ namespace glc{
         }
         
         double getLipschitzConstant() override {
-            return 1.0;
+            return 0.0;
         }
     };
     

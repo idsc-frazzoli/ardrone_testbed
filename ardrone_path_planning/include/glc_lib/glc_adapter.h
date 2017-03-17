@@ -73,11 +73,12 @@ namespace glc{
     public:        
         bool collisionFree(const Trajectory& x, int* last=NULL) override
         {
-            return true;
+          collision_counter++;
+          return true;
         }
         bool collisionFree(const glc::vctr& x, const double& t) override
         {
-            return true;
+          return true;
         }
         
     };

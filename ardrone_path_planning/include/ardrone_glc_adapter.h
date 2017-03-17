@@ -241,13 +241,12 @@ public:
     motion_planner.Plan(out);
     glc::printTraj(current_plan);
     std::cout << "GLC running time: " << out.time << std::endl;
-    current_plan = motion_planner.recover_traj( motion_planner.path_to_root(true) );
+    current_plan = motion_planner.recoverTraj( motion_planner.pathToRoot(true) );
     
     //Send Trajectory markers to rviz
     traj_marker.points.clear();
     glc::vctr x;
-    for(int i=0;i<current_plan.size();i++)
-    {
+    for(int i=0;i<current_plan.size();i++){
       x=current_plan.getState(i);
       p.x=x[0];
       p.y=x[1];
@@ -258,8 +257,7 @@ public:
     return;
   }
   
-  void replan(glc::vctr _from_here)
-  {
+  void replan(glc::vctr _from_here){
     replan(_from_here, goal->getGoal());
     return;
   }
