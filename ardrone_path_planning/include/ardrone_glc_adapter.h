@@ -231,15 +231,15 @@ public:
     parameters.x0=from_here;
     goal->setGoal(to_here);
     heuristic->setGoal(to_here);
-    glc::trajectory_planner motion_planner(&obstacles, 
+    glc::GLCPlanner motion_planner(&obstacles, 
                                            goal, 
                                            dynamic_model, 
                                            heuristic,
                                            performance_objective,
                                            parameters,
                                            controls->points);
-    motion_planner.plan(out);
-    glc::print_traj(current_plan);
+    motion_planner.Plan(out);
+    glc::printTraj(current_plan);
     std::cout << "GLC running time: " << out.time << std::endl;
     current_plan = motion_planner.recover_traj( motion_planner.path_to_root(true) );
     

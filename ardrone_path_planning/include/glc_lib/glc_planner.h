@@ -12,7 +12,7 @@
 
 namespace glc{  
   
-  class trajectory_planner
+  class GLCPlanner
   {
   public:
     int num;
@@ -69,18 +69,18 @@ namespace glc{
     void switch_root(); // temp
     void remove_subtree(nodePtr& root); // TODO domains should clear if empty
     std::vector<nodePtr> path_to_root(bool forward=false);
-    Trajectory recover_traj(const std::vector<nodePtr>& path);
+    Trajectory recoverTraj(const std::vector<nodePtr>& path);
     
     
     //Planner methods
     void expand();
-    void plan(PlannerOutput& out);
-    void plan();
+    void Plan(PlannerOutput& out);
+    void Plan();
     bool get_solution(Trajectory& traj_out);
     
     
     //ctor
-    trajectory_planner(Obstacles* _obs, 
+    GLCPlanner(Obstacles* _obs, 
                        GoalRegion* _goal, 
                        DynamicalSystem* _dynamics, 
                        Heuristic* _h,
@@ -144,14 +144,14 @@ namespace glc{
   
   
   // TODO make member of node    
-  void trajectory_planner::add_child(nodePtr parent, nodePtr child){
+  void GLCPlanner::add_child(nodePtr parent, nodePtr child){
     child->parent = parent;
     child->depth = parent->depth+1;
     child->t = (parent->t+expand_time);
     parent->children[child->u_idx] = child;
   }
   
-  void trajectory_planner::expand()
+  void GLCPlanner::expand()
   {
     
     iter++;
@@ -182,29 +182,24 @@ namespace glc{
       dynamics->sim(new_traj, current_node->t, current_node->t+expand_time , current_node->x, controls[i]);
       nodePtr new_arc(new node(controls.size()));//Move all this into constructor of new_arc
       new_arc->cost = cf->cost(new_traj, controls[i])+current_node->cost;
-//       std::cout << "1-new arc size " << new_arc->x.size() << std::endl;
       
       new_arc->u_idx = i;
       new_traj.back(new_arc->x, new_arc->t);
       new_arc->merit = new_arc->cost + h->costToGo(new_arc->x);//comes after assigning x
-//       std::cout << "2-new arc size " << new_arc->x.size() << std::endl;
       
       traj_from_parent[new_arc] = new_traj;
       
       vctr w = partition_scale * new_arc->x;
       Domain d_new;
       d_new.coordinate = vec_floor( w );
-//       std::cout << "3-new arc size " << new_arc->x.size() << std::endl;
       
       
-      // the following yields a reference to either the new domain or the existing one
       Domain& bucket = const_cast<Domain&>( *(domain_labels.insert(d_new).first) );
       domains_needing_update.insert(&bucket);
       
-      //Add new_arc to the candidates queue for collision checking since it cant be discarded
       if(new_arc->cost <= bucket.label->cost+eps /* and mew_arc->t <= bucket.label->t*/)
       {
-        bucket.candidates.push(new_arc);//These arcs can potentially get pushed to main Q and even relabel region.
+        bucket.candidates.push(new_arc);
       }     
     }
     
@@ -272,7 +267,7 @@ namespace glc{
     return;
   }
   
-  void trajectory_planner::plan(PlannerOutput& out)
+  void GLCPlanner::plan(PlannerOutput& out)
   {
     while(live)
     {
@@ -283,7 +278,7 @@ namespace glc{
     return;
   }
   
-  void trajectory_planner::plan()
+  void GLCPlanner::plan()
   {
     while(live)
     {
@@ -294,7 +289,7 @@ namespace glc{
   }
   
   //get the nodePtr path to the root with the order specified by foward
-  std::vector<nodePtr> trajectory_planner::path_to_root(bool forward)
+  std::vector<nodePtr> GLCPlanner::path_to_root(bool forward)
   {
     nodePtr currentNode = best;
     std::vector<nodePtr> path;
@@ -311,7 +306,7 @@ namespace glc{
   }
   
   //return the planned trajectory
-  Trajectory trajectory_planner::recover_traj(const std::vector<nodePtr>& path)
+  Trajectory GLCPlanner::recoverTraj(const std::vector<nodePtr>& path)
   {
     
     Trajectory opt_sol;

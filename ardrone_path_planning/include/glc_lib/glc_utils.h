@@ -106,7 +106,7 @@ namespace glc{
 
 // TODO move to glc_debug.h
     //Write trajectory out on the screen
-    void print_traj(const Trajectory& sol)
+    void printTraj(const Trajectory& sol)
     {
         printf("\n*****   Trajectory   *****\n");
         printf("time:  state:");
