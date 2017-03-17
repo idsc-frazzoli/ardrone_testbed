@@ -231,22 +231,23 @@ public:
     parameters.x0=from_here;
     goal->setGoal(to_here);
     heuristic->setGoal(to_here);
-    glc::trajectory_planner motion_planner(&obstacles, 
+    glc::GLCPlanner motion_planner(&obstacles, 
                                            goal, 
                                            dynamic_model, 
                                            heuristic,
                                            performance_objective,
                                            parameters,
                                            controls->points);
-    motion_planner.plan(out);
-    glc::print_traj(current_plan);
-    current_plan = motion_planner.recover_traj( motion_planner.path_to_root(true) );
+
+    motion_planner.Plan(out);
+    glc::printTraj(current_plan);
+    std::cout << "GLC running time: " << out.time << std::endl;
+    current_plan = motion_planner.recoverTraj( motion_planner.pathToRoot(true) );
     
     //Send Trajectory markers to rviz
     traj_marker.points.clear();
     glc::vctr x;
-    for(int i=0;i<current_plan.size();i++)
-    {
+    for(int i=0;i<current_plan.size();i++){
       x=current_plan.getState(i);
       p.x=x[0];
       p.y=x[1];
@@ -257,8 +258,7 @@ public:
     return;
   }
   
-  void replan(glc::vctr _from_here)
-  {
+  void replan(glc::vctr _from_here){
     replan(_from_here, goal->getGoal());
     return;
   }

@@ -106,7 +106,7 @@ namespace glc{
 
 // TODO move to glc_debug.h
     //Write trajectory out on the screen
-    void print_traj(const Trajectory& sol)
+    void printTraj(const Trajectory& sol)
     {
         printf("\n*****   Trajectory   *****\n");
         printf("time:  state:");
@@ -175,8 +175,8 @@ namespace glc{
         
         nodePtr parent;
         std::vector< nodePtr > children;//TODO maybe std::unordered_map?
-        vctr x;
-        double t;
+        vctr state;
+        double time;
         double cost;
         double merit;
         int u_idx; // index of control input from parent
@@ -187,63 +187,38 @@ namespace glc{
         {
             parent=nullptr;
             cost=cost_;
-            t=t_;
+            time=t_;
             merit=merit_;
             children.resize(card_omega);
         }
         
-        node(const vctr& state, const int control, 
+        node(int _card_omega, int _control_index, double _cost, double _cost_to_go, vctr& _state, double _time) : children(_card_omega), cost(_cost), merit(_cost_to_go+_cost), time(_time), parent(nullptr), state(_state),u_idx(_control_index){}
+        
+        node(const vctr& _state, const int control, 
              double rootCost, double time, int card_omega):
              node(card_omega, rootCost, time, 0.0)
              {
-                 x=state;
+                 state=_state;
                  u_idx=control;
              }
              
         //root constructor
-        node(Parameters params,int card_omega):node(card_omega)
-             {
-                 children.resize(card_omega);
-                 x.resize(params.state_dim);
-                 x=params.x0;
-                 depth = 0;
-             }
-             
-             //              //Uniform cost order, default comparison of nodes
-             //              bool operator<(node other)
-             //              {
-             //                  return merit>=other.merit;
-             //                  return cost>=other.cost;
-             //              }
-             
+        node(Parameters params,int card_omega):children(card_omega),state(params.x0),depth(0){}
     };
     
     const nodePtr node::inf_cost_node(new node(0, DBL_MAX/2, 0.0, DBL_MAX/2));//TODO used?
     
-    class QueueOrder
+    bool compareMerit(const nodePtr& node1, const nodePtr& node2){
+      return node1->merit<node2->merit;
+    }
+    class NodeMeritOrder
     {
         
     public:
-        bool operator()(const nodePtr& node1, const nodePtr& node2)
-        {
-            return node1->merit>=node2->merit;//A*     
+        bool operator()(const nodePtr& node1, const nodePtr& node2){
+            return not compareMerit(node1,node2);//negation so top of queue is min not max     
         }
         
-    };
-    
-    // struct candidate{
-    //     glcm::node path;
-    // //   glcm::Trajectory Trajectory;
-    // //   double pathCost;
-    // //   double edgeCost;//TODO needed?
-    // };
-    
-    class cptrcompare{ // TODO rename
-    public:
-        bool operator() (const nodePtr& l, const nodePtr& r)
-        {
-            return l->cost > r->cost; // TODO ensure this yields top being smallest cost
-        }
     };
     
     class Domain
@@ -253,16 +228,15 @@ namespace glc{
         std::vector<int> coordinate;
         nodePtr label;
         
-        std::priority_queue<nodePtr, std::vector<nodePtr>, cptrcompare> candidates;
+        std::priority_queue<nodePtr, std::vector<nodePtr>, NodeMeritOrder> candidates;
         
         Domain(){
             label = node::inf_cost_node;//Initialize to nullptr and don't use this thing
         }
         
-        Domain(const nodePtr& _label)
-        {
+        Domain(const nodePtr& _label){
             label = _label;
-            coordinate=vec_floor(label->x);
+            coordinate=vec_floor(label->state);
         }
         
         bool empty(){
@@ -270,88 +244,18 @@ namespace glc{
         }
         
         //Lexicographical order of integer tuple for sorting stl set of domains
-        bool operator<(const Domain& y) const
-        {
+        bool operator<(const Domain& y) const{
             assert(coordinate.size()==y.coordinate.size());
             return std::lexicographical_compare <std::vector<int>::const_iterator, std::vector<int>::const_iterator>
             (coordinate.begin(), coordinate.end(), y.coordinate.begin(), y.coordinate.end());
         }
     };
     
-    //Create a grid over the hyper-rectancle defined by umin and umax
-    // TODO 
-//     void grid_control(std::deque<vctr>& controls, vctr& umin, vctr& umax, std::vector<int>& RES, int open)
-//     {
-//         std::deque<vctr> bucket;
-//         bucket.clear();
-//         vctr u(umin.size());
-//         int count=1;
-//         for(int i=0;i<=RES[0]-open;i++)
-//         {
-//             u[0]=umin.at(0)+((double) i)*(umax.at(0)-umin.at(0))/RES[0];
-//             bucket.push_back(u);
-//         }
-//         
-//         for(int k=1;k<umin.size();k++)//repeat for each channel
-//         {
-//             //         count*=RES[k];
-//             count =bucket.size();
-//             for(int j=0;j<count;j++)//go through each element in bucket
-//             {
-//                 u=bucket.front();
-//                 bucket.pop_front();
-//                 for(int i=0;i<=RES[k]-open;i++)//and tack on all convex combos
-//                 {
-//                     u[k]=umin.at(k)+((double) i)*(umax.at(k)-umin.at(k))/RES[k];
-//                     bucket.push_back(u);
-//                 }
-//             }
-//         }
-//         controls.clear();
-//         std::copy(bucket.begin(), bucket.end(), std::back_inserter(controls));
-//     }
-    
     struct PlannerOutput
     {
         double cost;
         double time;
     };
-    
-//     std::vector< std::vector<double> > omegaR(const int m, const int exp, const int R)
-//     {
-//         
-//         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-//         std::default_random_engine generator(seed);
-//         std::normal_distribution<double> distribution(0.0,1.0);
-//         std::vector< vctr > controls(0);
-//         double normal_rv,nearest;
-//         vctr input(0);
-//         for(int j=0;j<100*pow(R,m);j++)
-//         {
-//             for(int i=0;i<m;i++)
-//             {
-//                 normal_rv=0.0;
-//                 while(normal_rv == 0.0)
-//                 {
-//                     normal_rv = (double) distribution(generator);
-//                 }
-//                 input.push_back(normal_rv);
-//             }
-//             input = (1.0/norm2(input))*input;
-//             nearest=DBL_MAX/2.0;
-//             for(int k=0;k<controls.size();k++)
-//             {
-//                 nearest=std::min( nearest,norm2(diff(controls[k],input)) );
-//             }
-//             if(nearest>=0.2/ (double) R)
-//             {
-//                 controls.push_back(input);
-//             }
-//             input.clear();
-//         }
-//         
-//         return controls;
-//     }
-    
+  
 }//end namespace
 #endif
