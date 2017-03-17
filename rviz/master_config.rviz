@@ -65,19 +65,7 @@ Visualization Manager:
           Value: false
         ardrone_base_link:
           Value: false
-        first_keyframe_base_link:
-          Value: false
-        first_keyframe_cam:
-          Value: false
         odom:
-          Value: false
-        orb_pose_unscaled:
-          Value: true
-        orb_pose_unscaled_cam:
-          Value: false
-        second_keyframe_base_link:
-          Value: false
-        second_keyframe_cam:
           Value: false
       Marker Scale: 1
       Name: TF
@@ -91,14 +79,6 @@ Visualization Manager:
               {}
             ardrone_base_frontcam:
               {}
-          second_keyframe_base_link:
-            second_keyframe_cam:
-              first_keyframe_cam:
-                first_keyframe_base_link:
-                  {}
-                orb_pose_unscaled_cam:
-                  orb_pose_unscaled:
-                    {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -240,17 +220,17 @@ Visualization Manager:
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.158917993
-        Y: -0.626883626
-        Z: -0.335688204
+        X: -0.0433237404
+        Y: -0.570689261
+        Z: -0.342050016
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.445203483
-      Target Frame: ardrone_base_frontcam
+      Pitch: 0.245203674
+      Target Frame: odom
       Value: Orbit (rviz)
-      Yaw: 5.76727772
+      Yaw: 6.06228161
     Saved: ~
 Window Geometry:
   Displays:
