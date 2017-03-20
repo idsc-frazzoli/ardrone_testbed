@@ -18,12 +18,15 @@ class ScaleEstimator
 {
 public:
     float scale = 1; // has units m^-1
-    float sxx=0, syy=0, sxy=0, orb_noise=0.2, nav_noise=0.1; // noise params must be tuned (init vals from tum)
+    float sxx=0, syy=0, sxy=0, orb_noise=0.2, nav_noise=0.6; // noise params must be tuned (init vals from tum)
+    
+    bool good_estimate;
 
     tf::Vector3 orb_displacement = tf::Vector3(0,0,0);
     tf::Vector3 nav_data_displacement = tf::Vector3(0,0,0);
     
     tf::Vector3 tot_orb_displacement = tf::Vector3(0,0,0);
+    tf::Vector3 init_displacement = tf::Vector3(0,0,0);
     tf::Vector3 tot_nav_data_displacement = tf::Vector3(0,0,0);;
         
     bool nav_init = false;
@@ -39,45 +42,6 @@ public:
     
     queue<ardrone_autonomy::Navdata> nav_data_queue;
     queue<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
-    
-
-//     {
-//       
-//         ros::Duration dt = ros::Time::now() - msg.header.stamp;
-// 	cout << "navdata callback with msg at time " << msg.header.stamp << " now " << ros::Time::now() <<  " delay is " << dt.toSec() << endl;
-// 
-// 	tf::StampedTransform base_link_to_odom;
-//         tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time(0), base_link_to_odom );
-// 
-//         float dx = msg.vx * dt.toSec() / 1000;
-//         float dy = msg.vy * dt.toSec() / 1000;
-//         float dz = ( msg.altd - curr_altd ) / 1000 ;
-// 
-//         curr_altd = msg.altd;
-// 
-//         tf::Vector3 displacement_odom = base_link_to_odom ( tf::Vector3 ( dx,dy,dz ) );
-// 	
-// 	nav_data_displacement += displacement_odom;
-//     cout << "current displacement is " << nav_data_displacement.getX() << " " <<nav_data_displacement.getY() << " "<<nav_data_displacement.getZ() << endl;
-//       
-// 
-//     }
-//     
-
-    /*
-      ros::Duration dt = ros::Time::now()-msg.header.stamp;
-      cout << "orb callback with msg from " << msg.header.stamp << " delay is " << dt.toSec() << endl; 
-	tf::Vector3 orb_position = tf::Vector3(msg.pose.pose.position.x, 
-						msg.pose.pose.position.y, 
-						msg.pose.pose.position.z);
-	
-	orb_displacement += orb_position - curr_orb_position;
-	curr_orb_position = orb_position;
-	orb_orientation = tf::Quaternion(msg.pose.pose.orientation.x, msg.pose.pose.orientation.y,
-					 msg.pose.pose.orientation.z, msg.pose.pose.orientation.w);
-      cout << "current displacement is " << orb_displacement.getX() << " " <<orb_displacement.getY() << " "<<orb_displacement.getZ() << endl;
-      
-    }*/
 
     void reset_all() {
       cout << "====================== reset ====================" << endl;
@@ -118,11 +82,8 @@ public:
         }
 
         void estimate_scale() {	
-	    // DEBUG naive scales in xyz directions
-	    double s_x = orb_displacement.getX()/nav_data_displacement.getX();
-	    double s_y = orb_displacement.getY()/nav_data_displacement.getY();
-	    double s_z = orb_displacement.getZ()/nav_data_displacement.getZ();
-	  
+	    
+	    
             // update sxx, sxy, syy
             sxx += nav_noise * nav_noise * orb_displacement.length2();
             syy += orb_noise * orb_noise * nav_data_displacement.length2();
@@ -133,8 +94,7 @@ public:
             if (sxy == 0) scale = 1;
 	    
 	    cout << "non-linear scale: " << scale << endl;
-	    cout << "naive scale x: " << s_x << " y: " << s_y << " z: " << s_z << endl; 
-        }
+	}
         
         void estimate_pose() {
 	
@@ -144,7 +104,7 @@ public:
 	  tot_nav_data_displacement += nav_data_displacement;
 	  tot_orb_displacement += orb_displacement;
 	  
-	  filt_position = f1*tot_orb_displacement + f2*tot_nav_data_displacement;
+	  filt_position += f1*tot_orb_displacement + f2*tot_nav_data_displacement;
 	  
 	  filt_pose.header.frame_id = "odom";
 	  filt_pose.header.stamp = ros::Time::now();
@@ -172,10 +132,11 @@ public:
 	
   void process_queue()
   {
+
     ros::Time t_oldest, t_newest;
-    ardrone_autonomy::Navdata curr_msg, old_msg;
-    tf::StampedTransform old_base_link_to_odom, new_base_link_to_odom;
-    
+    tf::StampedTransform old_odom_to_base_link, new_odom_to_base_link;
+    geometry_msgs::PoseWithCovarianceStamped oldest_orb_msg, newest_orb_msg;
+	  
     cout << "orb msgs: " << orb_data_queue.size()<<endl<<"nav msgs: " <<nav_data_queue.size()<<endl;
      
     // process orb
@@ -183,155 +144,66 @@ public:
     {
       orb_init = false;//do smth
       return;
-    } else {
-      cout << "processing orb msgs: " << endl; 
-    
+    } else {    
       orb_init = true;
       
-      geometry_msgs::PoseWithCovarianceStamped oldest_orb_msg, newest_orb_msg;
       oldest_orb_msg = orb_data_queue.front();
       orb_data_queue.pop();
       while (!orb_data_queue.empty())
       {
 	newest_orb_msg = orb_data_queue.front();
-// 	cout << "next newest orb pose at " << t_newest.toSec() << " x:" <<  newest_orb_msg.pose.pose.position.x <<
-//        " y:" <<  newest_orb_msg.pose.pose.position.y << " z:" <<   newest_orb_msg.pose.pose.position.z << endl;
-   
 	orb_data_queue.pop();
       }
       
       t_oldest = oldest_orb_msg.header.stamp;
       t_newest = newest_orb_msg.header.stamp;
       
-      cout << "t_oldest: " << fmod(t_oldest.toSec() , 1000) << endl << "t_newest: " << fmod(t_newest.toSec() , 1000) << 
-      endl << " duration: " << t_newest.toSec() -t_oldest.toSec() <<endl;
-      
       double dx, dy, dz;
       dx = newest_orb_msg.pose.pose.position.x - oldest_orb_msg.pose.pose.position.x; 
       dy = newest_orb_msg.pose.pose.position.y - oldest_orb_msg.pose.pose.position.y; 
       dz = newest_orb_msg.pose.pose.position.z - oldest_orb_msg.pose.pose.position.z; 
-      
-//       cout << "oldest orb pose at " << t_oldest.toSec() << " x:" <<  oldest_orb_msg.pose.pose.position.x <<
-//        " y:" <<  oldest_orb_msg.pose.pose.position.y << " z:" <<   oldest_orb_msg.pose.pose.position.z << endl;
-//       cout << "newest orb pose at " << t_newest.toSec() << " x:" <<  newest_orb_msg.pose.pose.position.x <<
-//        " y:" <<  newest_orb_msg.pose.pose.position.y << " z:" <<   newest_orb_msg.pose.pose.position.z << endl;
-       
-      cout << "displacement orb: " <<endl<< "x: " << dx << endl << "y: " << dy << endl <<"z: " << dz << endl;
-      
+
+           
       orb_displacement = tf::Vector3(dx,dy,dz);    
       orb_orientation = tf::Quaternion(newest_orb_msg.pose.pose.orientation.x,
 				       newest_orb_msg.pose.pose.orientation.y,
 				       newest_orb_msg.pose.pose.orientation.z,
 				       newest_orb_msg.pose.pose.orientation.w);
     }
-       tf::Vector3 ground_truth = tf::Vector3(0,0,0);
-    // process nav data
+
+   // process nav data
    if (nav_data_queue.size() < 2)
     {
       nav_init = false;//do smth
       return;
     } else {
       nav_init = true;
+
+      try {
+      tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_oldest, old_odom_to_base_link );
+      tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_newest, new_odom_to_base_link );
+
+      } catch (tf2::ExtrapolationException e) {
+	cout << e.what() << endl;
+      }   
       
+      nav_data_displacement = new_odom_to_base_link.getOrigin() - old_odom_to_base_link.getOrigin();
       
-      
-      old_msg = nav_data_queue.front();
-      nav_data_queue.pop();
-      int counter = 0;
-      while (!nav_data_queue.empty())
+      if (13 < nav_data_displacement.angle(orb_displacement) * 180 /3.14159)
       {
-	curr_msg = nav_data_queue.front();
-	nav_data_queue.pop();
-	
-	if (curr_msg.header.stamp.toSec() < t_oldest.toSec() /*&& curr_msg.header.stamp.toSec() > t_newest.toSec()*/)
-	{
-	  old_msg = curr_msg;
-	  counter++;
-// 	  cout << "throwing out msg " << counter << endl;
-	  
-	  continue;
-	} else {
-	  //cout << "keeping msg with stamp: " << fmod(curr_msg.header.stamp.toSec() , 1000) << endl;
-	  
-	  try {
-	  tf_listener.lookupTransform ( "/ardrone_base_link", "odom", old_msg.header.stamp, old_base_link_to_odom );
-	  tf_listener.lookupTransform ( "/ardrone_base_link", "odom", curr_msg.header.stamp, new_base_link_to_odom );
-	  
-	    
-	  } catch (tf2::ExtrapolationException e) {
-	   tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time(0), old_base_link_to_odom );
-	   tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time(0), new_base_link_to_odom );
-	  } 
-	  
-	  ground_truth += new_base_link_to_odom.getOrigin() - old_base_link_to_odom.getOrigin(); 
-	  
-	  old_base_link_to_odom.setOrigin(tf::Vector3(0,0,0));
-	  new_base_link_to_odom.setOrigin(tf::Vector3(0,0,0));
-	  
-	  
-	  // figure out times to interpolate between
-	  ros::Duration max_duration = old_msg.header.stamp - curr_msg.header.stamp; // duration between current and old msg
-	  ros::Time t_old = old_msg.header.stamp; // time stamp of old message
-	  ros::Time t_curr = curr_msg.header.stamp; // time stamp of curr message
-	  double interpol;
-	  ros::Duration dt = max_duration;
-	  
-	  if (t_curr.toSec() > t_newest.toSec())
-	  {
-	    interpol = (t_newest.toSec() - t_old.toSec()) / (t_curr.toSec() - t_old.toSec()); 
-	    dt = t_newest - t_old; 
-	    
-	  } else if (t_old.toSec() < t_oldest.toSec())
-	  {
-	    interpol = (t_oldest.toSec() - t_old.toSec()) / (t_curr.toSec() - t_old.toSec()); 
-	    dt = t_curr - t_oldest; 
-	  } else {
-	    
-	    interpol = 0.5;
-	  }	    
-	  
-	  double v_x_avg = old_msg.vx + (curr_msg.vx - old_msg.vx) * interpol;
-	  double v_y_avg = old_msg.vy + (curr_msg.vy - old_msg.vy) * interpol;
-	    
-	  cout << "average v_x: " << v_x_avg << " v_y: " << v_y_avg << endl;
-	  
-	  tf::Matrix3x3 R = old_base_link_to_odom.getBasis().inverse();
-	  
-	  tf::Vector3 old_altd = old_base_link_to_odom(tf::Vector3(0,0,old_msg.altd));
-	  tf::Vector3 new_altd = new_base_link_to_odom(tf::Vector3(0,0,curr_msg.altd));
-	  
-	  double dz = new_altd[2] - new_altd[2];  
-
-	  dz *= dt.toSec()/max_duration.toSec();
-	  
-	  double v_z_avg;
-	  if (dt.toSec() < 1e-6 or R[2][2] < 1e-6) {
-	    v_z_avg = 0;
-	  } else {
-	    v_z_avg = (dz/dt.toSec() - R[2][0] * v_x_avg - R[2][1] * v_y_avg ) / R[2][2]; 
-	  }
-	  
-	  nav_data_displacement += R * tf::Vector3(dt.toSec()*v_x_avg, dt.toSec()*v_y_avg, dt.toSec()*v_z_avg);
-	  
-	  old_msg = curr_msg;
-
-	  if (t_curr.toSec() > t_newest.toSec()) break; 
-        }
-      } 
-          
-    
+	good_estimate = true;
+      } else {
+	estimate_scale();
+	good_estimate = false;
+      }
+      
+      cout << "angle: " << endl << nav_data_displacement.angle(orb_displacement) * 180 /3.14159 << endl;
+      cout << "scale: " << endl << scale;
+      cout << "orb: " << orb_displacement.length() << "\t" << "nav: " << nav_data_displacement.length() << endl;
+      
     }
-    cout << "displacement nav_data: " <<endl<< "x: " << nav_data_displacement.getX() << endl << 
-    "y: " << nav_data_displacement.getY() << endl <<"z: " << nav_data_displacement.getZ() << endl;
-    cout << "displacement orb " <<endl << "x: " << orb_displacement.getX() << endl << 
-    "y: " << orb_displacement.getY() << endl <<"z: " << orb_displacement.getZ() << endl;
-    
-    cout << "Angle between orb and nav: " << orb_displacement.angle(nav_data_displacement) << endl;
-    cout << "Norm ratio: " << orb_displacement.length() / nav_data_displacement.length() << endl;
-    cout << "ground truth: " << ground_truth.getX() << " " << ground_truth.getY() << " " << ground_truth.getZ() << endl;
     
   }
-
   
 
   void publish_scale(ros::Publisher &publisher)
@@ -351,6 +223,11 @@ public:
   void nav_data_callback ( ardrone_autonomy::Navdata msg ) {
 	nav_data_queue.push(msg);
     }
+    
+  void set_initial_nav_position(tf::Vector3 pos)
+  {
+    init_displacement = pos;
+  }
   
 };
     
@@ -370,7 +247,7 @@ public:
         ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled",2 );
         ros::Publisher orb_scale_pub = nh.advertise<std_msgs::Float32> ( "/orb/scale", 2 );
 	
-	int rate = 5;
+	int rate = 2;
         ros::Rate loop_rate ( rate );
 	cout << "Started scale estimation with rate " << rate << endl; 
 	
@@ -378,13 +255,9 @@ public:
 	
         while ( ros::ok() ) {	  
             // work through all messages received
-	    cout << "***************Storing messages***************" << endl;
             ros::spinOnce();
-	    cout << "***************Finished***************" << endl;
-	    
-	    cout << "***************processing messages***************" << endl;
+
 	    scale_est.process_queue(); // computes displacements for nav_data msgs and orb poses
-	    cout << "***************finished***************" << endl;
 	    
 	    if (not scale_est.orb_init or not scale_est.nav_init)
 	    {
@@ -394,33 +267,22 @@ public:
 	      continue;
 	    }
 	    
-	    
-	    cout << "***************estimating scale***************" << endl;
-	    scale_est.estimate_scale(); // estimates scale based on new displacements
-	    cout << "***************finished***************" << endl;
-	    
-	    cout << "***************estimating pose***************" << endl;
 	    scale_est.estimate_pose(); // estimates a filtered pose
-	    cout << "***************finished***************" << endl;
-	    
-	    cout << "***************publishing scale messages***************" << endl;
+	
 	    scale_est.publish_scale(orb_scale_pub);
-	    cout << "***************finished***************" << endl;
 	    
-	    cout << "***************publishing orb pose***************" << endl;
 	    scale_est.publish_scaled_pose(filt_orb_pub);
-	    cout << "***************finished***************" << endl;
 	    
 	    cout << "***************reseting***************" << endl;
 	    scale_est.reset_all();
-	    cout << "***************finished***************" << endl;
 	    
             // TODO: debug
             std_msgs::Float32 scale = scale_est.get_scale();
 	    geometry_msgs::PoseWithCovarianceStamped scaled_orb_pose = scale_est.get_scaled_pose();
 	    
             cout << "SCALE: " << scale << endl;
-            cout << "SCALED POSE: " << scaled_orb_pose.pose.pose.position.x << " "
+            cout << "SCALED POSE: " 
+	         << scaled_orb_pose.pose.pose.position.x << " "
                  << scaled_orb_pose.pose.pose.position.y << " "
                  << scaled_orb_pose.pose.pose.position.z << endl;
 	   // debug

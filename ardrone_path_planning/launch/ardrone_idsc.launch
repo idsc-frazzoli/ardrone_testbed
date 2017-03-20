@@ -7,6 +7,9 @@
   <remap from="/camera/image_raw" to="/ardrone/front/image_raw" />
   </node>
 
+<!-- launch scale estimator-->
+  <node name="scale_estimator" pkg="ardrone_controller" type="scale_estimator" output="screen" />
+
 <!-- launch hector trajectory plotter -->
   <node name="hector_trajectory_server" pkg="hector_trajectory_server" type="hector_trajectory_server" output="screen" />
 
