@@ -68,7 +68,7 @@ public:
         heuristic = new glc::ZeroHeuristic();
         
         //Visualization stuff
-        traj_marker.header.frame_id = "world";
+        traj_marker.header.frame_id = "odom";
         traj_marker.ns = "trajectory_visualisation";
         traj_marker.id = 2;
         traj_marker.type = visualization_msgs::Marker::CUBE_LIST;

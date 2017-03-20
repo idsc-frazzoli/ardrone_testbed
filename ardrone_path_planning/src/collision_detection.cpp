@@ -60,7 +60,7 @@ int main(int argc, char **argv)
     ros::start();
     
     ros::NodeHandle node_handle;
-    ros::Subscriber point_cloud_sub = node_handle.subscribe("environment/point_cloud", 2, &PointCloudEnvironment::updatePointCloud, &obstacles);
+    ros::Subscriber point_cloud_sub = node_handle.subscribe("orb/point_cloud", 2, &PointCloudEnvironment::updatePointCloud, &obstacles);
     
     ros::Rate loop_rate(2);
     while(ros::ok())
