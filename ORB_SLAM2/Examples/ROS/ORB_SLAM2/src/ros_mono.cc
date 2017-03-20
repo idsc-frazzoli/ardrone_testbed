@@ -132,7 +132,7 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
     cv::Mat Tcw = mpSLAM->TrackMonocular ( cv_ptr->image,cv_ptr->header.stamp.toSec() );
-
+    ros::Time t = msg->header.stamp;
 
     //////////////////////////////////TRANSFORMATIONS//////////////////////////////////////////////////////////////////
     //To fuse the orb SLAM pose estimate with the Kalman Filter of the robot_localization package, it is
@@ -186,7 +186,7 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr& msg )
 
         //tf::Transform cam_to_first_keyframe_transform = cvMatToTF ( Tcw );
         tf::Transform orb_pose_unscaled_cam_to_first_keyframe_cam = cvMatToTF ( Tcw );
-        ros::Time t = ros::Time::now();
+       
 	
 	if(debug_mode){
 	  // odom to second_keyframe_base_link
