@@ -66,36 +66,26 @@ public:
 class ScaleEstimator {
 public:
      float scale = 1; // has units m^-1
-     float sxx=0, syy=0, sxy=0, orb_noise=0.2, nav_noise=0.01; // noise params must be tuned (init vals from tum)
+     float sxx=0, syy=0, sxy=0, 
+     
+     // tuning parameters
+     orb_noise=0.2, nav_noise=0.01; // noise params must be tuned (init vals from tum)
      float dot_prod_tol = 0.1;
      float ratio = 0.2;
-     int cos_angle_tol = 400;
      int scale_samples = 10;
      
-     
-     bool good_estimate;
-
      tf::Vector3 orb_displacement = tf::Vector3 ( 0,0,0 );
      tf::Vector3 nav_data_displacement = tf::Vector3 ( 0,0,0 );
      tf::Vector3 newest_orb_position = tf::Vector3 ( 0,0,0 );
 
-     tf::Vector3 tot_orb_displacement = tf::Vector3 ( 0,0,0 );
      tf::Vector3 init_displacement = tf::Vector3 ( 0,0,0 );
-     tf::Vector3 tot_nav_data_displacement = tf::Vector3 ( 0,0,0 );;
 
-     bool nav_init = false;
-     bool orb_init = false;
      bool fixed_scale = false;
 
      geometry_msgs::PoseWithCovarianceStamped filt_pose;
-     tf::Vector3 filt_position;
-     tf::Quaternion orb_orientation;
 
      tf::TransformListener tf_listener;
 
-     tf::Vector3 curr_orb_position;
-
-     queue<ardrone_autonomy::Navdata> nav_data_queue;
      queue<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
      vector<ScaleStruct> scale_vector;
      
@@ -109,9 +99,6 @@ public:
           // clear queue
           queue<geometry_msgs::PoseWithCovarianceStamped> empty1;
           swap ( orb_data_queue, empty1 );
-
-          queue<ardrone_autonomy::Navdata> empty;
-          swap ( nav_data_queue, empty );
      }
 
      void estimate_scale() {
@@ -202,11 +189,8 @@ public:
 
           // process orb
           if ( orb_data_queue.size() < 2 ) {
-               orb_init = false;//do smth
                return;
           } else {
-               orb_init = true;
-
                oldest_orb_msg = orb_data_queue.front();
                orb_data_queue.pop();
                while ( !orb_data_queue.empty() ) {
