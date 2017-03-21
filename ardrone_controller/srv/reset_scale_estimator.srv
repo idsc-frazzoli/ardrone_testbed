@@ -1,0 +1,6 @@
+# Request: reset scale estimator
+bool in
+---
+# Responce: ok | ko
+bool status
+
