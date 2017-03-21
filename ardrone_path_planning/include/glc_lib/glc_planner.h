@@ -1,3 +1,9 @@
+/* Copyright (C) Brian Paden (bapaden@mit.edu) - All Rights Reserved
+ * Written by Brian Paden
+ * Incorporation into open source software is not permitted.
+ * Use in private (closed source) projects for academic research is permitted.
+ */
+
 #ifndef GLC_PLANNER_H
 #define GLC_PLANNER_H
 
@@ -62,7 +68,6 @@ namespace glc{
     params(_params), controls(_controls), dynamics(_dynamics), obs(_obs), goal(_goal), cf(_cf), h(_h){
       root_ptr = nodePtr(new node(params,controls.size()));
       root_ptr->merit=h->costToGo(root_ptr->state);//note the cost is zero
-      
       Domain d0(root_ptr);
       queue.push(root_ptr);
       domain_labels.insert(d0);
@@ -145,8 +150,7 @@ namespace glc{
       glc::vctr terminal_state;
       double terminal_time;
       new_traj.back(terminal_state,terminal_time);//assigns terminal_state and time to args
-      
-      nodePtr new_arc(new node(controls.size(),i,cf->cost(new_traj, controls[i])+current_node->cost, h->costToGo(new_arc->state), terminal_state, terminal_time));
+      nodePtr new_arc(new node(controls.size(),i,cf->cost(new_traj, controls[i])+current_node->cost, h->costToGo(terminal_state), terminal_state, terminal_time));
       
       traj_from_parent[new_arc] = new_traj;
       

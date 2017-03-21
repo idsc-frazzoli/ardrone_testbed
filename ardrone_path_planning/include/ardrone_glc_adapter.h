@@ -128,7 +128,7 @@ class ArDroneHeuristic : public glc::Heuristic{
 glc::vctr goal;
 double max_velocity = 2.0;//HACK-depends on ARdrone model
 public:
-  ArDroneHeuristic(const glc::vctr& _goal):goal(_goal){}
+  ArDroneHeuristic(const glc::vctr& _goal):goal(_goal){std::cout << " goal size " << goal.size() << std::endl;}
 //   void setGoal(const glc::vctr& _goal){goal=_goal;}
   double costToGo(const glc::vctr& state) override {
     return sqrt( glc::sqr(state[0]-goal[0]) + glc::sqr(state[1]-goal[1]) )/max_velocity;//HACK-depends on cost function

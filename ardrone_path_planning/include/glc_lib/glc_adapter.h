@@ -1,3 +1,9 @@
+/* Copyright (C) Brian Paden (bapaden@mit.edu) - All Rights Reserved
+ * Written by Brian Paden
+ * Incorporation into open source software is not permitted.
+ * Use in private (closed source) projects for academic research is permitted.
+ */
+
 #ifndef GLC_ADAPTER_H
 #define GLC_ADAPTER_H
 
