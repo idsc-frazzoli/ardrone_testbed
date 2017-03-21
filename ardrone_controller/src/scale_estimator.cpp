@@ -6,6 +6,7 @@
 #include <ardrone_autonomy/Navdata.h>
 
 #include <std_msgs/Float32.h>
+//#include "reset_scale_estimator.h"
 
 #include <tf/LinearMath/Transform.h>
 #include <tf/transform_listener.h>
@@ -66,17 +67,15 @@ public:
 class ScaleEstimator {
 public:
      float scale = 1; // has units m^-1
-     float sxx=0, syy=0, sxy=0, 
      
      // tuning parameters
-     orb_noise=0.2, nav_noise=0.01; // noise params must be tuned (init vals from tum)
-     float dot_prod_tol = 0.1;
+     float orb_noise=0.2, nav_noise=0.01; // noise params must be tuned (init vals from tum)
+     float dot_prod_tol = 0.05;
      float ratio = 0.2;
      int scale_samples = 10;
      
      tf::Vector3 orb_displacement = tf::Vector3 ( 0,0,0 );
      tf::Vector3 nav_data_displacement = tf::Vector3 ( 0,0,0 );
-     tf::Vector3 newest_orb_position = tf::Vector3 ( 0,0,0 );
 
      tf::Vector3 init_displacement = tf::Vector3 ( 0,0,0 );
 
@@ -89,17 +88,27 @@ public:
      queue<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
      vector<ScaleStruct> scale_vector;
      
-     // testing 
-     vector<float> scale_testing_vector;
-     
-     void reset_all() {
+     void reset() {
+          // reset dispacements
           nav_data_displacement = tf::Vector3 ( 0.0, 0.0, 0.0 );
           orb_displacement = tf::Vector3 ( 0.0, 0.0, 0.0 );
 
           // clear queue
-          queue<geometry_msgs::PoseWithCovarianceStamped> empty1;
-          swap ( orb_data_queue, empty1 );
+          queue<geometry_msgs::PoseWithCovarianceStamped> empty;
+          swap ( orb_data_queue, empty );
      }
+     
+     void hard_reset()
+     {
+       reset();
+       
+       // also reset scale etc.
+       scale = 1;
+       fixed_scale = false;
+       scale_vector.clear();
+       geometry_msgs::PoseWithCovarianceStamped empty_pose;
+       filt_pose = empty_pose;
+     }   
 
      void estimate_scale() {
 	  // taken from tum   
@@ -176,9 +185,7 @@ public:
      {       
        cout << endl << endl;
        cout << "scale: " << "\t" << scale << endl;
-       cout << "scaled pose: " << "\t" << filt_pose.pose.pose.position.x 
-				 << "\t" << filt_pose.pose.pose.position.y
-				 << "\t" << filt_pose.pose.pose.position.z << endl;
+       cout << "scaled pose x:" << "\t" << filt_pose.pose.pose.position.x  <<endl;
      }
 
      void process_queue() {
@@ -275,6 +282,9 @@ public:
 
           // estimates scale
           ScaleEstimator scale_est;
+	  
+	  // reset command
+	  //ros::ServiceServer s = nh.advertiseService("reset_scale_estimator", &ScaleEstimator::hard_reset, &scale_est);
 
           // subscribe to orb pose and accelerometer data from imu
           ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orb_callback, &scale_est );
@@ -286,7 +296,7 @@ public:
           int counter = 0;
           ros::Rate loop_rate ( rate );
 
-          scale_est.reset_all();
+          scale_est.reset();
 
           while ( ros::ok() ) {
                // work through all messages received
@@ -296,12 +306,12 @@ public:
 		 // computes displacements for nav_data msgs and orb poses
                     scale_est.process_queue(); 
                     scale_est.estimate_scale();
-		    scale_est.reset_all();
+		    scale_est.reset();
                     counter = 0;
                }
                // set latest orb pose
                scale_est.set_orb_pose();
-               //scale_est.print_all();
+               scale_est.print_all();
 
                scale_est.publish_scaled_pose ( filt_orb_pub );
 

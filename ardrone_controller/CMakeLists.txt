@@ -18,6 +18,11 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   include
  )
+ 
+ add_service_files(
+ FILES
+ reset_scale_estimator.srv
+ )
 
 catkin_package(
   INCLUDE_DIRS include include/glc_lib
