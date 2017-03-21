@@ -57,6 +57,7 @@ ${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
 ${PROJECT_SOURCE_DIR}/../../../lib/libORB_SLAM2.so
 )
+message(STATUS "====================MY_VAR={${PROJECT_SOURCE_DIR}}==============")
 
 # Node for monocular camera
 rosbuild_add_executable(Mono

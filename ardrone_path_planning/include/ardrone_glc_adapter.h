@@ -87,7 +87,7 @@ public:
     std::cout << " Built kdtree in " << ((float)(clock()-t))/CLOCKS_PER_SEC << " seconds " << std::endl;
     std::cout << "Tree size: " << kdtree->size() << std::endl;
   }
-  bool collisionFree(const glc::vctr& state, const double& t){
+  bool collisionFree(const glc::vctr& state, const double& t) override {
     collision_counter++;
     //If the kdtree has not yet been build cannot collision check
     if(kdtree==nullptr){
