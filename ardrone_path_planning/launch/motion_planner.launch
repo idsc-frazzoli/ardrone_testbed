@@ -1,7 +1,7 @@
 <launch>
   <node pkg="rviz" type="rviz" name="rviz" args="../../master_config.rviz"/>
   <node pkg="ardrone_path_planning" type="motion_planner_node" name="motion_planner_node" />
-  <node pkg="ORB_SLAM2" name="ORB_mono" type="Mono" output="screen" args="$(find ardrone_orb)/ORBvoc.txt  $(find ardrone_orb)/settings.yaml">
+  <node pkg="ardrone_orb" name="ORB_mono" type="ros_orb_node" output="screen" args="$(find ardrone_orb)/ORBvoc.txt  $(find ardrone_orb)/settings.yaml">
     <remap from="/camera/image_raw" to="/ardrone/front/image_raw" />
   </node>
 </launch>
