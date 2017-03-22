@@ -1,3 +1,9 @@
+/* Copyright (C) Brian Paden (bapaden@mit.edu) - All Rights Reserved
+ * Written by Brian Paden
+ * Incorporation into open source software is not permitted.
+ * Use in private (closed source) projects for academic research is permitted.
+ */
+
 #ifndef MATH_UTILS_H
 #define MATH_UTILS_H
 

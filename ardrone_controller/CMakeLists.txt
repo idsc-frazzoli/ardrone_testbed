@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ardrone_controller)
 
+
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -std=c++0x -O3")
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_DEBUG} -std=c++0x")#for debug
 
@@ -25,7 +27,7 @@ include_directories(
  )
 
 catkin_package(
-  INCLUDE_DIRS include include/glc_lib
+  INCLUDE_DIRS include
   CATKIN_DEPENDS roscpp std_msgs sensor_fusion_comm message_runtime
 )
 

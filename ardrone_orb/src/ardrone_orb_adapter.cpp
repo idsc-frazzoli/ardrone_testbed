@@ -39,7 +39,7 @@
 
 #include<opencv2/core/core.hpp>
 
-#include "../../../include/System.h"
+#include <System.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -62,7 +62,7 @@ public:
      ORB_SLAM2::System *mpSLAM;
 
      bool initialized = false;
-     bool debug_mode = true;
+     bool debug_mode = false;
 
      sensor_msgs::PointCloud pc;
      geometry_msgs::PoseWithCovarianceStamped pose_out_;
@@ -296,3 +296,4 @@ tf::Transform ImageGrabber::cvMatToTF ( cv::Mat Tcw )
 
      return cam_to_first_keyframe_transform;
 }
+
