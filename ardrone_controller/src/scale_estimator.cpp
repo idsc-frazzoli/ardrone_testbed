@@ -232,10 +232,8 @@ public:
 		
 	       // add new point estimate
                ScaleStruct s = ScaleStruct(orb_displacement, nav_data_displacement);
-	       cout << "tol = " << s.pi/s.ptamNorm << endl;
 	       if (s.pi > dot_prod_tol * s.ptamNorm) 
 	       {
-		 cout << "taking scale" << endl;
 		 scale_vector.push_back(s);
 	       }
           }
