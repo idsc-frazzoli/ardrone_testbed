@@ -80,6 +80,7 @@ public:
      tf::Vector3 init_displacement = tf::Vector3 ( 0,0,0 );
 
      bool fixed_scale = false;
+     bool orb_init = true;
 
      geometry_msgs::PoseWithCovarianceStamped filt_pose;
 
@@ -98,7 +99,7 @@ public:
           swap ( orb_data_queue, empty );
      }
      
-     void hard_reset()
+     bool hard_reset()
      {
        reset();
        
@@ -108,6 +109,7 @@ public:
        scale_vector.clear();
        geometry_msgs::PoseWithCovarianceStamped empty_pose;
        filt_pose = empty_pose;
+       return true;
      }   
 
      void estimate_scale() {
@@ -196,8 +198,10 @@ public:
 
           // process orb
           if ( orb_data_queue.size() < 2 ) {
+	       orb_init = false;
                return;
           } else {
+	       orb_init = true;
                oldest_orb_msg = orb_data_queue.front();
                orb_data_queue.pop();
                while ( !orb_data_queue.empty() ) {
@@ -263,6 +267,9 @@ public:
 
           void publish_scaled_pose ( ros::Publisher &publisher ) {
                publisher.publish ( filt_pose );
+	      
+	       
+	       
           }
 
           void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {

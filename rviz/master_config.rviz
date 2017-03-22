@@ -65,7 +65,19 @@ Visualization Manager:
           Value: false
         ardrone_base_link:
           Value: false
+        first_keyframe_base_link:
+          Value: false
+        first_keyframe_cam:
+          Value: false
         odom:
+          Value: true
+        orb_pose_unscaled:
+          Value: true
+        orb_pose_unscaled_cam:
+          Value: false
+        second_keyframe_base_link:
+          Value: false
+        second_keyframe_cam:
           Value: false
       Marker Scale: 1
       Name: TF
@@ -79,6 +91,14 @@ Visualization Manager:
               {}
             ardrone_base_frontcam:
               {}
+          second_keyframe_base_link:
+            second_keyframe_cam:
+              first_keyframe_cam:
+                first_keyframe_base_link:
+                  {}
+                orb_pose_unscaled_cam:
+                  orb_pose_unscaled:
+                    {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -132,8 +152,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 0.841750324
-        Min Value: -0.0287141614
+        Max Value: 0.636062682
+        Min Value: -0.353733212
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -160,8 +180,8 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Alpha: 1
-      Axes Length: 1
-      Axes Radius: 0.100000001
+      Axes Length: 0.5
+      Axes Radius: 0.0500000007
       Class: rviz_plugin_covariance/PoseWithCovariance
       Color: 234; 0; 255
       Covariance:
@@ -179,16 +199,16 @@ Visualization Manager:
           Scale: 1
           Value: true
         Value: false
-      Enabled: true
+      Enabled: false
       Head Length: 0.300000012
       Head Radius: 0.100000001
       Name: PoseWithCovariance
       Shaft Length: 1
       Shaft Radius: 0.0500000007
-      Shape: Arrow
-      Topic: ""
+      Shape: Axes
+      Topic: /orb/pose_scaled
       Unreliable: false
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -213,7 +233,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.7944901
+      Distance: 4.59873104
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
@@ -227,10 +247,10 @@ Visualization Manager:
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.245203674
+      Pitch: 0.780203223
       Target Frame: odom
       Value: Orbit (rviz)
-      Yaw: 6.06228161
+      Yaw: 3.21409822
     Saved: ~
 Window Geometry:
   Displays:
