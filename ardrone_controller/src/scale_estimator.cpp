@@ -73,6 +73,8 @@ public:
      float dot_prod_tol = 0.05;
      float ratio = 0.2;
      int scale_samples = 10;
+     float log_likelihood = 1e7;
+     int max_scale_vector_size = 20;
      
      tf::Vector3 orb_displacement = tf::Vector3 ( 0,0,0 );
      tf::Vector3 nav_data_displacement = tf::Vector3 ( 0,0,0 );
@@ -111,77 +113,6 @@ public:
        filt_pose = empty_pose;
        return true;
      }   
-
-     void estimate_scale() {
-	  // taken from tum   
-	  // find median.
-	  sort(scale_vector.begin(), scale_vector.end());
-	  
-	  double median; 
-	  if (scale_vector.size() < 5)
-	  {
-	    median = 1;
-	  }
-	  else {
- 	    median = scale_vector[(scale_vector.size()+1)/2].alphaSingleEstimate;
-	  }
-	  // find sums and median.
-	  // do separately for xy and z and xyz-all and xyz-filtered
-	  double sumII = 0;
-	  double sumPP = 0;
-	  double sumPI = 0;
-	  double totSumII = 0;
-	  double totSumPP = 0;
-	  double totSumPI = 0;
-	  
-	  double sumIIxy = 0;
-	  double sumPPxy = 0;
-	  double sumPIxy = 0;
-	  double sumIIz = 0;
-	  double sumPPz = 0;
-	  double sumPIz = 0;
-
-	  int numIn = 0;
-	  int numOut = 0;
-	  int count = 0;
-	  
-	  for(unsigned int i=0;i<scale_vector.size();i++)
-	  {
-		  if(scale_vector.size() < 5 || (scale_vector[i].alphaSingleEstimate > median * ratio && scale_vector[i].alphaSingleEstimate < median / ratio))
-		  {
-			  sumII += scale_vector[i].ii;
-			  sumPP += scale_vector[i].pp;
-			  sumPI += scale_vector[i].pi;
-
-			  sumIIxy += scale_vector[i].imu[0]*scale_vector[i].imu[0] + scale_vector[i].imu[1]*scale_vector[i].imu[1];
-			  sumPPxy += scale_vector[i].ptam[0]*scale_vector[i].ptam[0] + scale_vector[i].ptam[1]*scale_vector[i].ptam[1];
-			  sumPIxy += scale_vector[i].ptam[0]*scale_vector[i].imu[0] + scale_vector[i].ptam[1]*scale_vector[i].imu[1];
-		  
-			  sumIIz += scale_vector[i].imu[2]*scale_vector[i].imu[2];
-			  sumPPz += scale_vector[i].ptam[2]*scale_vector[i].ptam[2];
-			  sumPIz += scale_vector[i].ptam[2]*scale_vector[i].imu[2];
-			  count++;
-
-		  }
-		  else
-		  {
-			  totSumII += scale_vector[i].ii;
-			  totSumPP += scale_vector[i].pp;
-			  totSumPI += scale_vector[i].pi;
-		  }
-	  }
-
-	  fixed_scale = fixed_scale or count > scale_samples;
-	  
-	  if (not fixed_scale)
-	  {
-	      scale = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, orb_noise,nav_noise);
-	      
-	  } else {
-	    cout << "scale fixed" << endl;
-	  }
-	  // taken from tum
-     }
      
      void print_all()
      {       
@@ -192,53 +123,131 @@ public:
 
      void process_queue() {
 
-          ros::Time t_oldest, t_newest;
+          ros::Time t_old, t_new;
           tf::StampedTransform old_odom_to_base_link, new_odom_to_base_link;
-          geometry_msgs::PoseWithCovarianceStamped oldest_orb_msg, newest_orb_msg;
+          geometry_msgs::PoseWithCovarianceStamped old_orb_msg, new_orb_msg;
 
           // process orb
-          if ( orb_data_queue.size() < 2 ) {
+          if ( orb_data_queue.size() < max_scale_vector_size ) {
+	       cout << "number of samples: " << orb_data_queue.size() << endl;
 	       orb_init = false;
                return;
           } else {
 	       orb_init = true;
-               oldest_orb_msg = orb_data_queue.front();
+	      
+	       // get oldest orb msg
+               old_orb_msg = orb_data_queue.front();
                orb_data_queue.pop();
-               while ( !orb_data_queue.empty() ) {
-                    newest_orb_msg = orb_data_queue.front();
+	       
+	       // work through all others
+               while ( !orb_data_queue.empty()) {
+                    // get next orb msg
+		    new_orb_msg = orb_data_queue.front();
                     orb_data_queue.pop();
-               }
+		    
+		    // get times, orb displacements and transforms at these times 
+		    t_old = old_orb_msg.header.stamp;
+		    t_new = new_orb_msg.header.stamp;
+		    
+		    double dx, dy, dz;
+		    dx = new_orb_msg.pose.pose.position.x - old_orb_msg.pose.pose.position.x;
+		    dy = new_orb_msg.pose.pose.position.y - old_orb_msg.pose.pose.position.y;
+		    dz = new_orb_msg.pose.pose.position.z - old_orb_msg.pose.pose.position.z;
+		    
+		    orb_displacement = tf::Vector3 ( dx,dy,dz );
+		    
+		    try {
+                    tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_old, old_odom_to_base_link );
+                    tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_new, new_odom_to_base_link );
 
-               t_oldest = oldest_orb_msg.header.stamp;
-               t_newest = newest_orb_msg.header.stamp;
-
-               double dx, dy, dz;
-               dx = newest_orb_msg.pose.pose.position.x - oldest_orb_msg.pose.pose.position.x;
-               dy = newest_orb_msg.pose.pose.position.y - oldest_orb_msg.pose.pose.position.y;
-               dz = newest_orb_msg.pose.pose.position.z - oldest_orb_msg.pose.pose.position.z;
-
-               orb_displacement = tf::Vector3 ( dx,dy,dz );
-
-               // process nav data
-               try {
-                    tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_oldest, old_odom_to_base_link );
-                    tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_newest, new_odom_to_base_link );
-
-               } catch ( tf2::ExtrapolationException e ) {
+		    } catch ( tf2::ExtrapolationException e ) {
                     cout << e.what() << endl;
+		    }
+		    
+		    nav_data_displacement = new_odom_to_base_link.getOrigin() - old_odom_to_base_link.getOrigin();
+		      
+		    // add new point estimate
+		    ScaleStruct s = ScaleStruct(orb_displacement, nav_data_displacement);
+		    
+		    if (true /*s.pi > dot_prod_tol * s.ptamNorm*/) // TODO maybe add condition 
+		    {
+		      scale_vector.push_back(s);
+		    }		
+		    
+		    old_orb_msg = new_orb_msg;
+		    
                }
-
-               nav_data_displacement = new_odom_to_base_link.getOrigin() - old_odom_to_base_link.getOrigin();
-		
-	       // add new point estimate
-               ScaleStruct s = ScaleStruct(orb_displacement, nav_data_displacement);
-	       if (s.pi > dot_prod_tol * s.ptamNorm) 
+               
+               // calculate new scale, displacements and likelihood for the data.
+               float scale_est = estimate_scale(scale_vector);
+	       vector<tf::Vector3> displacement_est = estimate_displacements(scale_vector, scale_est);
+	       float log_likelihood_est = estimate_likelihood(scale_vector, scale_est, displacement_est);
+	       
+	       cout << "new batch estimate: " << endl;
+	       cout << "\t cur scale: " << scale << endl;
+	       cout << "\t new scale: " << scale_est << endl;
+	       cout << "\t cur likelihood: " << log_likelihood << endl;
+	       cout << "\t old likelihood: " << log_likelihood_est << endl;
+	       
+	       // replace scale if the log likelihood is better
+	       if (log_likelihood_est < log_likelihood)
 	       {
-		 scale_vector.push_back(s);
+		 log_likelihood = log_likelihood_est;
+		 scale = scale_est;
 	       }
+	       
+	       // clear the queue
+	       reset();
+               
           }
      }
-
+     
+  vector<tf::Vector3> estimate_displacements(vector<ScaleStruct> scale_vector, float scale_est)
+  {
+    vector<tf::Vector3> displacement_vector;
+    for (int i=0; i < scale_vector.size(); i++)
+    {
+      tf::Vector3 x = scale_vector[i].ptam;
+      tf::Vector3 y = scale_vector[i].imu;
+      
+      float d = scale_est * scale_est * nav_noise * nav_noise + orb_noise * orb_noise;
+      tf::Vector3 mu = 1 / d * (x * scale_est * nav_noise * nav_noise + y * orb_noise * orb_noise);
+      displacement_vector.push_back(mu);
+    }
+    return displacement_vector;
+  }
+  
+  float estimate_likelihood(vector<ScaleStruct> scale_vector, float scale_est, vector<tf::Vector3> displacement_est)
+  {
+    float likelihood_func = 0;
+    for (int i=0; i < displacement_est.size(); i++)
+    {
+      tf::Vector3 diff_x = scale_vector[i].ptam - scale_est * displacement_est[i];
+      tf::Vector3 diff_y = scale_vector[i].imu - displacement_est[i];
+      likelihood_func += diff_x.length2() / (2*orb_noise * orb_noise) + diff_y.length2() / (2*nav_noise * nav_noise);
+    }
+    
+    return likelihood_func;
+  }
+  
+  float estimate_scale(vector<ScaleStruct> scale_vector) {
+       float s_xx, s_yy, s_xy;
+       s_xx = s_yy = s_xy = 0;
+       
+       for (int i=0; i<scale_vector.size(); i++)
+       {
+	 s_xx += scale_vector[i].pp;
+	 s_yy += scale_vector[i].ii;
+	 s_xy += scale_vector[i].pi;
+	  
+       }
+       
+       return ScaleStruct::computeEstimator(s_xx, s_yy, s_xy, orb_noise, nav_noise);
+	  
+     }
+  
+  
+      
   void set_orb_pose() {
 	if ( orb_data_queue.empty() ) return;
 
@@ -258,16 +267,8 @@ public:
   }
 
 
-
-          void publish_scale ( ros::Publisher &publisher ) {
-               publisher.publish ( scale );
-          }
-
           void publish_scaled_pose ( ros::Publisher &publisher ) {
-               publisher.publish ( filt_pose );
-	      
-	       
-	       
+               publisher.publish ( filt_pose ); 
           }
 
           void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
@@ -298,7 +299,6 @@ public:
           ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled",2 );
 
           int rate = 20;
-          int counter = 0;
           ros::Rate loop_rate ( rate );
 
           scale_est.reset();
@@ -307,13 +307,9 @@ public:
                // work through all messages received
                ros::spinOnce();
 	       
-               if ( counter % 10 == 0 ) {
-		 // computes displacements for nav_data msgs and orb poses
-                    scale_est.process_queue(); 
-                    scale_est.estimate_scale();
-		    scale_est.reset();
-                    counter = 0;
-               }
+	       // computes displacements for nav_data msgs and orb poses
+	       scale_est.process_queue(); 
+	       
                // set latest orb pose
                scale_est.set_orb_pose();
                scale_est.print_all();
@@ -321,7 +317,6 @@ public:
                scale_est.publish_scaled_pose ( filt_orb_pub );
 
                loop_rate.sleep();
-               counter++;
           }
 
           return 0;
