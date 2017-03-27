@@ -11,6 +11,7 @@
 #include <tf/LinearMath/Transform.h>
 #include <tf/transform_listener.h>
 #include <tf/LinearMath//Vector3.h>
+#include <tf/transform_broadcaster.h>
 #include <tf/tfMessage.h>
 
 using namespace std;
@@ -82,10 +83,13 @@ public:
 class ScaleEstimator {
 public:
      float scale = 1; // has units m^-1
-
-     tf::Quaternion yaw_correction;
-     int drone_state;
+      
+     // used for correcting yaw switch
+     tf::Quaternion yaw_correction = tf::Quaternion(0,0,0,1);
+     tf::Quaternion quat_corr = tf::Quaternion(0,0,0,1);
      ros::Time drone_state_time;
+     bool quat_init = false;
+     bool correction_made = false;
 
      // tuning parameters
      float orb_noise=0.01, nav_noise=0.2; // noise params must be tuned (init vals from tum)
@@ -106,6 +110,7 @@ public:
      geometry_msgs::PoseWithCovarianceStamped filt_pose;
 
      tf::TransformListener tf_listener;
+     tf::TransformBroadcaster tf_broadcaster;
 
      queue<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
      vector<ScaleStruct> scale_vector;
@@ -299,34 +304,54 @@ public:
      }
 
      void nav_callback ( ardrone_autonomy::Navdata navdata ) {
-       	  tf::Transform takeoff_tf, landed_tf; 
-       
-          if ( navdata.state == 6)
+       	  tf::StampedTransform takeoff_tf, landed_tf, curr_tf;
+	  tf::Quaternion curr_quat = tf::Quaternion(0, 0, 0);
+	    
+	  cout << abs(curr_quat.angle(quat_corr)) << endl;
+	  if ( not quat_init)
 	  {
-	      //isFirstFlag = true; maybe use
-	    
-	    tf_listener.lookupTransform ( "odom", "/ardrone_base_link", navdata.header.stamp, takeoff_tf );
-            tf_listener.lookupTransform ( "odom", "/ardrone_base_link", drone_state_time, landed_tf );
-	    
-	    cout << "state: " << navdata.state << endl << "axes: " << takeoff_tf.getRotation().x << "\t" << takeoff_tf.getRotation().y << "\t" << takeoff_tf.getRotation().z << "\t" << takeoff_tf.getRotation().x << endl;
-	    
-	    yaw_correction = takeoff_tf.getRotation() * landed_tf.getRotation().inverse();
-	  } 
-	  else if (navdata.state == 7)
-	  {
-
-	    tf_listener.lookupTransform ( "odom", "/ardrone_base_link", navdata.header.stamp, takeoff_tf );
-            tf_listener.lookupTransform ( "odom", "/ardrone_base_link", drone_state_time, landed_tf );
-	    
-	    cout << "state: " << navdata.state << endl << "axes: " << takeoff_tf.getRotation().x << "\t" << takeoff_tf.getRotation().y << "\t" << takeoff_tf.getRotation().z << "\t" << takeoff_tf.getRotation().x << endl;
-	    
-	  }
-	  else {
-	   if ( true /*not isFirstFlag*/){
-	  
+	    quat_corr = tf::Quaternion(navdata.rotZ * 3.14159 / 180, navdata.rotY * 3.14159 / 180, navdata.rotX * 3.14159 / 180);
 	    drone_state_time = navdata.header.stamp;
-	   }
+	    
+	    quat_init = true;
+	  } 
+	  else if (not correction_made) 
+	  {
+	    tf::Quaternion curr_quat = tf::Quaternion(navdata.rotZ * 3.14159 / 180, navdata.rotY * 3.14159 / 180, navdata.rotX * 3.14159 / 180);
+	    
+	    if (abs(curr_quat.angle(quat_corr)) > 5 * 3.14159 / 180)
+	    {
+	      cout << abs(curr_quat.angle(quat_corr)) << endl;
+	      
+	      tf_listener.lookupTransform ( "odom", "/ardrone_base_link", navdata.header.stamp, takeoff_tf );
+	      tf_listener.lookupTransform ( "odom", "/ardrone_base_link", drone_state_time, landed_tf );
+	      
+	      yaw_correction = takeoff_tf.getRotation() * landed_tf.getRotation().inverse();
+	      
+	      correction_made = true;
+	    }
+	    else
+	    {
+	      quat_corr = tf::Quaternion(navdata.rotZ * 3.14159 / 180, navdata.rotY * 3.14159 / 180, navdata.rotX * 3.14159 / 180);navdata.rotZ;
+	      drone_state_time = navdata.header.stamp;
+	    }
 	  }
+	 
+	 // publish corrected navdata pose
+	 try {
+	      tf_listener.lookupTransform ( "/ardrone_base_link", "odom", navdata.header.stamp, curr_tf );
+
+	    } 
+	    catch ( tf2::ExtrapolationException e ) 
+	    {
+	      cout << e.what() << endl;
+	    }
+	    
+	    curr_tf.setOrigin(tf::quatRotate(yaw_correction, curr_tf.getOrigin()));
+	    curr_tf.frame_id_ = "/ardrone_base_link_corr";
+	    curr_tf.child_frame_id_ = "odom";
+	    
+	    tf_broadcaster.sendTransform(curr_tf);	 
      }
 
 void set_initial_nav_position ( tf::Vector3 pos ) {
