@@ -9,7 +9,7 @@
 
 
 <!-- launch scale estimator-->
-  <node name="scale_estimator" pkg="ardrone_controller" type="scale_estimator" output="screen" />
+  <node name="scale_degug" pkg="ardrone_controller" type="scale_debug" output="screen" />
 
 <!-- launch hector trajectory plotter -->
   <node name="hector_trajectory_server" pkg="hector_trajectory_server" type="hector_trajectory_server" />
