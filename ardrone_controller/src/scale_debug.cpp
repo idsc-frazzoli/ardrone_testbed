@@ -236,8 +236,7 @@ public:
           printVector ( "position", filt_pose );
      }
 
-     void process_queue() {
-
+     void process_queue() { //TODO: there is a bug somewhere here that leads to segfault
           ros::Time t_oldest, t_newest;
           tf::StampedTransform old_odom_to_base_link, new_odom_to_base_link, nav_tf;
           geometry_msgs::PoseWithCovarianceStamped oldest_orb_msg, newest_orb_msg, orb_msg;
@@ -307,21 +306,6 @@ public:
           }
      }
 
-     //Copies oldest message in orb msg buffer into internal pose variable
-     void set_orb_pose() {
-          if ( orb_data_queue.empty() ) return;
-
-          geometry_msgs::PoseWithCovarianceStamped newest_orb_msg = orb_data_queue.back();
-
-          filt_pose.header.stamp = newest_orb_msg.header.stamp;
-          filt_pose.header.frame_id = "odom";
-
-          filt_pose.pose.pose.orientation = newest_orb_msg.pose.pose.orientation;
-          filt_pose.pose.pose.position.x = newest_orb_msg.pose.pose.position.x /scale;
-          filt_pose.pose.pose.position.y = newest_orb_msg.pose.pose.position.y /scale;
-          filt_pose.pose.pose.position.z = newest_orb_msg.pose.pose.position.z /scale;
-     }
-
      void nav_callback ( ardrone_autonomy::Navdata navdata ) {
           float deg_to_rad = 3.14159 / 180;
 
@@ -362,12 +346,21 @@ public:
           publisher.publish ( scale );
      }
      void publish_scaled_pose ( ros::Publisher &publisher ) {
-	  printVector("filtered pose: ", filt_pose);
+	  //printVector("filtered pose: ", filt_pose);
           publisher.publish ( filt_pose );
      }
      void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
           orb_data_queue.push_front ( msg );
+
+          filt_pose.header.stamp = msg.header.stamp;
+          filt_pose.header.frame_id = "odom";
+
+          filt_pose.pose.pose.orientation = msg.pose.pose.orientation;
+          filt_pose.pose.pose.position.x = msg.pose.pose.position.x /scale;
+          filt_pose.pose.pose.position.y = msg.pose.pose.position.y /scale;
+          filt_pose.pose.pose.position.z = msg.pose.pose.position.z /scale;
      }
+     
      void set_initial_nav_position ( tf::Vector3 pos ) {
           init_displacement = pos;
      }
