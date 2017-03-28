@@ -184,7 +184,7 @@ public:
     parameters.dt_max = 0.25;
     parameters.max_iter = 5000;
     parameters.time_scale = 10;
-    parameters.partition_scale = 8.0;
+    parameters.partition_scale = 7.0;
     parameters.x0 = current_state;
     double goal_radius = 2.0;
     glc::vctr xg({10.0,0.0,20.0,0.0,0.0});
