@@ -85,8 +85,8 @@ public:
      float scale = 1; // has units m^-1
       
      // used for correcting yaw switch
-     tf::Quaternion yaw_correction = tf::Quaternion(0,0,0,1);
-     tf::Quaternion quat_corr = tf::Quaternion(0,0,0,1);
+     tf::Transform T_correction;
+     tf::StampedTransform T_prev, T_curr, T_init;
      ros::Time drone_state_time;
      bool quat_init = false;
      bool correction_made = false;
@@ -114,6 +114,15 @@ public:
 
      queue<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
      vector<ScaleStruct> scale_vector;
+     
+     
+     ScaleEstimator()
+     {
+       T_correction.setIdentity();
+       T_prev.setIdentity();
+       T_curr.setIdentity();
+       T_init.setIdentity();
+     }
 
      void reset() {
           // reset dispacements
@@ -187,8 +196,8 @@ public:
                     } catch ( tf2::ExtrapolationException e ) {
                          cout << e.what() << endl;
                     }
-
-                    nav_data_displacement = tf::quatRotate(yaw_correction, new_odom_to_base_link.getOrigin() - old_odom_to_base_link.getOrigin());
+		    
+                    nav_data_displacement = T_correction(new_odom_to_base_link.getOrigin() - old_odom_to_base_link.getOrigin());
 
                     // add new point estimate
                     ScaleStruct s = ScaleStruct ( orb_displacement, nav_data_displacement, orb_noise, nav_noise );
@@ -304,55 +313,35 @@ public:
      }
 
      void nav_callback ( ardrone_autonomy::Navdata navdata ) {
-       	  tf::StampedTransform takeoff_tf, landed_tf, curr_tf;
-	  tf::Quaternion curr_quat = tf::Quaternion(0, 0, 0);
-	    
-	  cout << abs(curr_quat.angle(quat_corr)) << endl;
-	  if ( not quat_init)
+	  float deg_to_rad = 3.14159 / 180;
+	  
+	  // get current frame
+	  try 
 	  {
-	    quat_corr = tf::Quaternion(navdata.rotZ * 3.14159 / 180, navdata.rotY * 3.14159 / 180, navdata.rotX * 3.14159 / 180);
-	    drone_state_time = navdata.header.stamp;
-	    
-	    quat_init = true;
-	  } 
-	  else if (not correction_made) 
+	    tf_listener.lookupTransform("odom", "/ardrone_base_link", navdata.header.stamp, T_curr);
+	    T_curr.setOrigin(tf::Vector3(0,0,0));
+	  }
+	  catch (tf2::ExtrapolationException e) {cout << e.what() << endl;}
+	  
+	  
+	  // initialize previous frame
+	  if ( not quat_init) { T_init = T_prev = T_curr; quat_init = true;} 
+	  
+	  if (not correction_made) 
 	  {
-	    tf::Quaternion curr_quat = tf::Quaternion(navdata.rotZ * 3.14159 / 180, navdata.rotY * 3.14159 / 180, navdata.rotX * 3.14159 / 180);
+	    // calculate correction transformation
+	    tf::Transform delta_T = T_curr.inverse() * T_prev;
 	    
-	    if (abs(curr_quat.angle(quat_corr)) > 5 * 3.14159 / 180)
-	    {
-	      cout << abs(curr_quat.angle(quat_corr)) << endl;
-	      
-	      tf_listener.lookupTransform ( "odom", "/ardrone_base_link", navdata.header.stamp, takeoff_tf );
-	      tf_listener.lookupTransform ( "odom", "/ardrone_base_link", drone_state_time, landed_tf );
-	      
-	      yaw_correction = takeoff_tf.getRotation() * landed_tf.getRotation().inverse();
-	      
-	      correction_made = true;
-	    }
-	    else
-	    {
-	      quat_corr = tf::Quaternion(navdata.rotZ * 3.14159 / 180, navdata.rotY * 3.14159 / 180, navdata.rotX * 3.14159 / 180);navdata.rotZ;
-	      drone_state_time = navdata.header.stamp;
-	    }
+	    // if angle jump is too large then assign the correction transform
+	    float angle_deg = delta_T.getRotation().getAngle() / deg_to_rad;
+	    if (abs(angle_deg) > 5) { T_correction = T_curr.inverse() * T_init; correction_made = true;}
+	    
+	    T_prev = T_curr;
 	  }
 	 
-	 // publish corrected navdata pose
-	 try {
-	      tf_listener.lookupTransform ( "/ardrone_base_link", "odom", navdata.header.stamp, curr_tf );
-
-	    } 
-	    catch ( tf2::ExtrapolationException e ) 
-	    {
-	      cout << e.what() << endl;
-	    }
-	    
-	    curr_tf.setOrigin(tf::quatRotate(yaw_correction, curr_tf.getOrigin()));
-	    curr_tf.frame_id_ = "/ardrone_base_link_corr";
-	    curr_tf.child_frame_id_ = "odom";
-	    
-	    tf_broadcaster.sendTransform(curr_tf);	 
-     }
+	 // publish corrected frame
+	 tf_broadcaster.sendTransform(tf::StampedTransform(T_correction, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected1"));
+    }
 
 void set_initial_nav_position ( tf::Vector3 pos ) {
           init_displacement = pos;
