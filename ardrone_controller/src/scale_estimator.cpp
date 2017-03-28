@@ -67,6 +67,8 @@ public:
 class ScaleEstimator {
 public:
      float scale = 1; // has units m^-1
+     float ubound_scale = 1;
+     float lbound_scale = 1;
      
      // tuning parameters
      float orb_noise=0.2, nav_noise=0.01; // noise params must be tuned (init vals from tum)
@@ -175,6 +177,9 @@ public:
 	  
 	  if (not fixed_scale)
 	  {
+	      lbound_scale = ScaleStruct::computeEstimator(sumPP, sumII, sumPI, 0.001, 1000);
+	      ubound_scale = ScaleStruct::computeEstimator(sumPP, sumII, sumPI, 1000, 0.001);
+	      
 	      scale = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, orb_noise,nav_noise);
 	      
 	  } else {
