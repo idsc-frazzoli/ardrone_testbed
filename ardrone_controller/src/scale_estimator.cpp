@@ -190,14 +190,14 @@ public:
                     orb_displacement = tf::Vector3 ( dx,dy,dz );
 
                     try {
-                         tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_old, old_odom_to_base_link );
-                         tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_new, new_odom_to_base_link );
+                         tf_listener.lookupTransform ( "odom", "/ardrone_base_link_corrected", t_old, old_odom_to_base_link );
+                         tf_listener.lookupTransform ( "odom", "/ardrone_base_link_corrected", t_new, new_odom_to_base_link );
 
                     } catch ( tf2::ExtrapolationException e ) {
                          cout << e.what() << endl;
                     }
 		    
-                    nav_data_displacement = T_correction(new_odom_to_base_link.getOrigin() - old_odom_to_base_link.getOrigin());
+                    nav_data_displacement = new_odom_to_base_link.getOrigin() - old_odom_to_base_link.getOrigin();
 
                     // add new point estimate
                     ScaleStruct s = ScaleStruct ( orb_displacement, nav_data_displacement, orb_noise, nav_noise );
@@ -340,7 +340,7 @@ public:
 	  }
 	 
 	 // publish corrected frame
-	 tf_broadcaster.sendTransform(tf::StampedTransform(T_correction, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected1"));
+	 tf_broadcaster.sendTransform(tf::StampedTransform(T_correction, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected"));
     }
 
 void set_initial_nav_position ( tf::Vector3 pos ) {
