@@ -15,7 +15,8 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf2
   tf2_geometry_msgs
-  tf2_ros)
+  tf2_ros
+  xmlrpcpp)
 
 # Attempt to find Eigen using its own CMake module.
 # If that fails, fall back to cmake_modules package.
