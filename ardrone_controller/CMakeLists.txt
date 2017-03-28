@@ -19,9 +19,9 @@ include_directories(
   include
  )
  
- add_service_files(
+add_service_files(
  FILES
- reset_scale_estimator.srv
+ SendFixedScale.srv
  )
 
 catkin_package(

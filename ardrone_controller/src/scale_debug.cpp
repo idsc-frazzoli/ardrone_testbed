@@ -382,6 +382,9 @@ int main ( int argc, char **argv )
 
      // publish scale and filtered orb pose
      ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled", 10 );
+     
+     // create service to transmit scale to orb when scale has been fixed
+     ros::ServiceClient scale_serv = nh.advertiseService<>()
 
      int rate = 20;
      int counter = 0;
@@ -398,7 +401,6 @@ int main ( int argc, char **argv )
                scale_est.reset();
                counter = 0;
           }
-          scale_est.set_orb_pose();
           //scale_est.print_all();
           scale_est.publish_scaled_pose ( filt_orb_pub );
 
