@@ -32,10 +32,10 @@ catkin_package(
 # include_directories(${catkin_INCLUDE_DIRS})
 add_executable(controller_node src/controller_node.cpp)
 add_executable(imu_calibration_node src/imu_calibration_node.cpp)
-add_executable(scale_estimator src/scale_estimator.cpp)
+#add_executable(scale_estimator src/scale_estimator.cpp)
 add_executable(scale_debug src/scale_debug.cpp)
 
 target_link_libraries(controller_node ${catkin_LIBRARIES})
 target_link_libraries(imu_calibration_node ${catkin_LIBRARIES})
-target_link_libraries(scale_estimator ${catkin_LIBRARIES})
+#target_link_libraries(scale_estimator ${catkin_LIBRARIES})
 target_link_libraries(scale_debug ${catkin_LIBRARIES})

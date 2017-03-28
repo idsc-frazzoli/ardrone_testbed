@@ -38,10 +38,14 @@ class ScaleStruct
 public:
   tf::Vector3 ptam;
   tf::Vector3 imu;
+  tf::Vector3 realDisplacement;
   double ptamNorm;
   double imuNorm;
   double alphaSingleEstimate;
   double pp, ii, pi;
+  
+  // inlier parameters
+  float dot_prod_tol = 0.05;
   
   static inline double computeEstimator(double spp, double sii, double spi, double stdDevPTAM = 0.2, double stdDevIMU = 0.1){
     double sII = stdDevPTAM * stdDevPTAM * sii;
@@ -59,7 +63,15 @@ public:
     
   }
   
-  inline ScaleStruct(tf::Vector3 ptamDist, tf::Vector3 imuDist)
+  static inline tf::Vector3 computeRealDisplacement ( tf::Vector3 ptam,tf::Vector3 imu, double alpha, double stdDevPTAM = 0.01, double stdDevIMU = 0.2 ) {
+          double d = alpha * alpha * stdDevIMU * stdDevIMU + stdDevPTAM * stdDevPTAM;
+          double f1 = alpha * stdDevIMU * stdDevIMU / d;
+          double f2 = stdDevPTAM * stdDevPTAM / d;
+
+          return ptam * f1 + imu * f2;
+  }
+  
+  inline ScaleStruct( tf::Vector3 ptamDist, tf::Vector3 imuDist, double stdDevPTAM, double stdDevIMU )
   {
     ptam = ptamDist;
     imu = imuDist;
@@ -70,7 +82,14 @@ public:
     ptamNorm = sqrt(pp);
     imuNorm = sqrt(ii);
     
-    alphaSingleEstimate = computeEstimator(pp,ii,pi);
+    alphaSingleEstimate = computeEstimator ( pp,ii,pi, stdDevPTAM, stdDevIMU );
+
+    realDisplacement = computeRealDisplacement ( ptam, imu, alphaSingleEstimate, stdDevPTAM, stdDevIMU );
+  }
+  
+  inline bool isInlier() 
+  {
+     return pi > dot_prod_tol * ptamNorm;
   }
   
   inline bool operator < (const ScaleStruct& comp) const
@@ -143,7 +162,6 @@ public:
     else{median = scale_vector[(scale_vector.size()+1)/2].alphaSingleEstimate;}
     
     // find sums and median.
-    // do separately for xy and z and xyz-all and xyz-filtered
     double sumII = 0;
     double sumPP = 0;
     double sumPI = 0;
@@ -242,9 +260,10 @@ public:
     nav_signal.setZ(nav_z->getOutput(t));
     
       // add new point estimate
-      ScaleStruct s = ScaleStruct(orb_signal, nav_signal);
-      cout << "tol = " << s.pi/s.ptamNorm << endl;
-      if (s.pi > dot_prod_tol * s.ptamNorm){
+      ScaleStruct s = ScaleStruct(orb_signal, nav_signal, orb_noise, nav_noise);
+      
+      if (s.isInlier())
+      {
         cout << "taking scale" << endl;
         scale_vector.push_back(s);
       }
