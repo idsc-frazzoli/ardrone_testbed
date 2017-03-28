@@ -62,7 +62,7 @@ public:
      ORB_SLAM2::System *mpSLAM;
 
      bool initialized = false;
-     bool debug_mode = false;
+     bool debug_mode = true;
 
      sensor_msgs::PointCloud pc;
      geometry_msgs::PoseWithCovarianceStamped pose_out_;

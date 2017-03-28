@@ -11,6 +11,7 @@
 #include <tf/transform_listener.h>
 #include <tf/LinearMath//Vector3.h>
 #include <tf/tfMessage.h>
+#include <tf/transform_broadcaster.h>
 #include <linear_system.h>
 
 using namespace std;
@@ -87,6 +88,14 @@ class ScaleEstimator {
   float scale = 1; // has units m^-1
   float scale_ubound = 1;
   float scale_lbound = 1;
+  
+  // nav data correction
+  bool quat_init = false;
+  bool correction_made = false;
+  tf::StampedTransform T_init, T_curr, T_prev;
+  tf::Transform T_correction;
+  tf::TransformBroadcaster br;
+  
   // tuning parameters
   const float orb_noise=0.2, nav_noise=0.01; // noise params must be tuned (init vals from tum)
   const float dot_prod_tol = 0.05;
@@ -102,9 +111,12 @@ class ScaleEstimator {
   
 public:
   
-  ScaleEstimator():orb_signal(0,0,0),nav_signal(0,0,0),first_msg(true){}
-  
-  
+  ScaleEstimator():orb_signal(0,0,0),nav_signal(0,0,0),first_msg(true){
+    T_init.setIdentity();
+    T_prev.setIdentity();
+    T_curr.setIdentity();
+    T_correction.setIdentity();
+  }
   
 //   tf::Vector3 orb_displacement = tf::Vector3 ( 0,0,0 );
 //   tf::Vector3 nav_data_displacement = tf::Vector3 ( 0,0,0 );
@@ -214,7 +226,7 @@ public:
       orb_z->timeStep(t,orb_msg.pose.pose.position.z);
       
       try {
-        tf_listener.lookupTransform ( "odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
+        tf_listener.lookupTransform ( "odom", "/ardrone_base_link_corrected", orb_msg.header.stamp, nav_tf );
         nav_x->timeStep(t,nav_tf.getOrigin().getX());
         nav_y->timeStep(t,nav_tf.getOrigin().getY());
         nav_z->timeStep(t,nav_tf.getOrigin().getZ());
@@ -253,6 +265,37 @@ public:
     filt_pose.pose.pose.position.z = newest_orb_msg.pose.pose.position.z /scale;
   }
   
+  void nav_callback ( ardrone_autonomy::Navdata navdata ) {
+    float deg_to_rad = 3.14159 / 180;
+    
+    // get current frame
+    try 
+    {
+      tf_listener.lookupTransform("odom", "/ardrone_base_link", navdata.header.stamp, T_curr);
+      T_curr.setOrigin(tf::Vector3(0,0,0));
+    }
+    catch (tf2::ExtrapolationException e) {cout << e.what() << endl;}
+    
+    
+    // initialize previous frame
+    if ( not quat_init) { T_init = T_prev = T_curr; quat_init = true;} 
+    
+    if (not correction_made) 
+    {
+      // calculate correction transformation
+      tf::Transform delta_T = T_curr.inverse() * T_prev;
+      
+      // if angle jump is too large then assign the correction transform
+      float angle_deg = delta_T.getRotation().getAngle() / deg_to_rad;
+      if (abs(angle_deg) > 5) { T_correction = T_curr.inverse() * T_init; correction_made = true;}
+      
+      T_prev = T_curr;
+    }
+    
+    // publish corrected frame
+    br.sendTransform(tf::StampedTransform(T_correction, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected"));
+  }
+  
   void publish_scale ( ros::Publisher &publisher ) {publisher.publish ( scale );}
   void publish_scaled_pose ( ros::Publisher &publisher ) {publisher.publish ( filt_pose );}
   void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {orb_data_queue.push_front ( msg );}
@@ -268,6 +311,9 @@ int main ( int argc, char **argv ) {
   
   // subscribe to orb pose and accelerometer data from imu
   ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orb_callback, &scale_est );
+  
+  // get rotation due to magnetic field
+  ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 10, &ScaleEstimator::nav_callback, &scale_est );
   
   // publish scale and filtered orb pose
   ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled",2 );
