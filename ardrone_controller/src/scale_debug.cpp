@@ -85,6 +85,8 @@ class ScaleEstimator {
   bool first_msg;
   bool fixed_scale = false;
   float scale = 1; // has units m^-1
+  float scale_ubound = 1;
+  float scale_lbound = 1;
   // tuning parameters
   const float orb_noise=0.2, nav_noise=0.01; // noise params must be tuned (init vals from tum)
   const float dot_prod_tol = 0.05;
@@ -133,19 +135,7 @@ public:
     double sumII = 0;
     double sumPP = 0;
     double sumPI = 0;
-    double totSumII = 0;
-    double totSumPP = 0;
-    double totSumPI = 0;
-    
-    double sumIIxy = 0;
-    double sumPPxy = 0;
-    double sumPIxy = 0;
-    double sumIIz = 0;
-    double sumPPz = 0;
-    double sumPIz = 0;
-    
-    int numIn = 0;
-    int numOut = 0;
+
     int count = 0;
     
     for(unsigned int i=0;i<scale_vector.size();i++){
@@ -153,32 +143,36 @@ public:
         sumII += scale_vector[i].ii;
         sumPP += scale_vector[i].pp;
         sumPI += scale_vector[i].pi;
-        
-        sumIIxy += scale_vector[i].imu[0]*scale_vector[i].imu[0] + scale_vector[i].imu[1]*scale_vector[i].imu[1];
-        sumPPxy += scale_vector[i].ptam[0]*scale_vector[i].ptam[0] + scale_vector[i].ptam[1]*scale_vector[i].ptam[1];
-        sumPIxy += scale_vector[i].ptam[0]*scale_vector[i].imu[0] + scale_vector[i].ptam[1]*scale_vector[i].imu[1];
-        
-        sumIIz += scale_vector[i].imu[2]*scale_vector[i].imu[2];
-        sumPPz += scale_vector[i].ptam[2]*scale_vector[i].ptam[2];
-        sumPIz += scale_vector[i].ptam[2]*scale_vector[i].imu[2];
+	
         count++;
-      }
-      else{
-        totSumII += scale_vector[i].ii;
-        totSumPP += scale_vector[i].pp;
-        totSumPI += scale_vector[i].pi;
       }
     }
     fixed_scale = fixed_scale or count > scale_samples;
     
-    if (not fixed_scale){scale = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, orb_noise,nav_noise);} 
+    if (not fixed_scale)
+    {
+      scale_ubound = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, .0001,10000);
+      scale_lbound = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, 100,.01);
+      scale = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, orb_noise,nav_noise);
+    } 
     else{cout << "scale fixed" << endl;}
   }
   
-  void print_all(){       
-    cout << endl << endl;
-    cout << "scale: " << "\t" << scale << endl;
-    cout << "scaled pose x:" << "\t" << filt_pose.pose.pose.position.x  <<endl;
+  void print_all(){      
+    float cur_orb_x = filt_pose.pose.pose.position.x / scale; 
+    float cur_orb_y = filt_pose.pose.pose.position.y / scale; 
+    float cur_orb_z = filt_pose.pose.pose.position.z / scale;
+    
+    tf::Vector3 u_bound_pos = tf::Vector3(cur_orb_x * scale_ubound, cur_orb_y * scale_ubound, cur_orb_z * scale_ubound);
+    tf::Vector3 l_bound_pos = tf::Vector3(cur_orb_x * scale_lbound, cur_orb_y * scale_lbound, cur_orb_z * scale_lbound);
+    
+    cout << endl;
+    
+    cout << "lower s: " << scale_lbound << "\t s: " << scale << "\t upper s: " << scale_ubound << endl;
+    
+    printVector("position lbound", l_bound_pos);
+    printVector("position ubound", u_bound_pos);
+    printVector("position", filt_pose);
   }
   
   void process_queue() {
