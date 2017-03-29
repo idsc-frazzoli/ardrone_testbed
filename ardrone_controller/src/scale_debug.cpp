@@ -7,6 +7,7 @@
 
 #include <std_msgs/Float32.h>
 
+#include <tf/tf.h>
 #include <tf/LinearMath/Transform.h>
 #include <tf/transform_listener.h>
 #include <tf/LinearMath//Vector3.h>
@@ -14,6 +15,9 @@
 #include <linear_system.h>
 
 using namespace std;
+typedef geometry_msgs::PoseWithCovarianceStamped poseMsgStamped;
+typedef geometry_msgs::Pose poseMsg;
+
 
 void printVector(const std::string& str, const tf::Vector3& vctr){
   std::cout << str << ": (" << vctr.x() << "," << vctr.y() << "," << vctr.z() << ")" << std::endl;
@@ -92,8 +96,8 @@ class ScaleEstimator {
   const int scale_samples = 10;
   tf::Vector3 orb_signal;
   tf::Vector3 nav_signal;
-  tf::Vector3 init_displacement = tf::Vector3 ( 0,0,0 );
-  geometry_msgs::PoseWithCovarianceStamped filt_pose;
+//   tf::Vector3 init_displacement = tf::Vector3 ( 0,0,0 );
+  geometry_msgs::PoseWithCovarianceStamped filt_pose, latest_pose;
   tf::TransformListener tf_listener;
   deque<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
   vector<ScaleStruct> scale_vector;
@@ -121,7 +125,7 @@ public:
     filt_pose = empty_pose;
   }   
   
-  void estimate_scale() {//TODO ugly code
+  void estimateScale() {//TODO ugly code
     sort(scale_vector.begin(), scale_vector.end());
     
     double median; 
@@ -175,20 +179,22 @@ public:
     else{cout << "scale fixed" << endl;}
   }
   
-  void print_all(){       
+  void printAll(){       
     cout << endl << endl;
     cout << "scale: " << "\t" << scale << endl;
     cout << "scaled pose x:" << "\t" << filt_pose.pose.pose.position.x  <<endl;
   }
   
-  void process_queue() {
+  //This gets called at every iteration of the ros loop
+  void processQueue() {
+    //Only process orb data if batch size is greater than 100 
+    if(orb_data_queue.size()<100){return;}
     
-    ros::Time t_oldest, t_newest;
-    tf::StampedTransform old_odom_to_base_link, new_odom_to_base_link, nav_tf;
-    geometry_msgs::PoseWithCovarianceStamped oldest_orb_msg, newest_orb_msg, orb_msg;
-    double t;
+    //Initialize nav datatype and orb message datatype to add sensor data to fution routine
+    tf::StampedTransform nav_tf;
+    poseMsgStamped orb_msg;
+    double t = orb_data_queue.back().header.stamp.toSec();
     
-    if(orb_data_queue.empty()){return;}
     while(orb_data_queue.size()>0){
       //get oldest message
       orb_msg = orb_data_queue.back();
@@ -218,13 +224,16 @@ public:
       orb_y->timeStep(t,orb_msg.pose.pose.position.y);
       orb_z->timeStep(t,orb_msg.pose.pose.position.z);
       
+      if( tf_listener.waitForTransform( "/odom", "/ardrone_base_link",orb_msg.header.stamp,
+        ros::Duration(1.0),ros::Duration(0.1))){
       try {
         
-        tf_listener.lookupTransform ( "odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
+        tf_listener.lookupTransform ( "/odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
         nav_x->timeStep(t,nav_tf.getOrigin().getX());
         nav_y->timeStep(t,nav_tf.getOrigin().getY());
         nav_z->timeStep(t,nav_tf.getOrigin().getZ());
       } catch( tf2::ExtrapolationException err ){cout << err.what() << endl; return;}
+    }
     }
     
     orb_signal.setX(orb_x->getOutput(t));
@@ -242,27 +251,28 @@ public:
         cout << "taking scale" << endl;
         scale_vector.push_back(s);
       }
+      estimateScale();
   }
   
   //Copies oldest message in orb msg buffer into internal pose variable
-  void set_orb_pose() {
-    if ( orb_data_queue.empty() ) return;
+  poseMsgStamped getScaledOrbPose() {
     
-    geometry_msgs::PoseWithCovarianceStamped newest_orb_msg = orb_data_queue.back();
-    
-    filt_pose.header.stamp = newest_orb_msg.header.stamp;
+    filt_pose.header.stamp = latest_pose.header.stamp;
     filt_pose.header.frame_id = "odom";
     
-    filt_pose.pose.pose.orientation = newest_orb_msg.pose.pose.orientation;
-    filt_pose.pose.pose.position.x = newest_orb_msg.pose.pose.position.x /scale;
-    filt_pose.pose.pose.position.y = newest_orb_msg.pose.pose.position.x /scale;
-    filt_pose.pose.pose.position.z = newest_orb_msg.pose.pose.position.z /scale;
+    filt_pose.pose.pose.orientation = latest_pose.pose.pose.orientation;
+    filt_pose.pose.pose.position.x = latest_pose.pose.pose.position.x /scale;
+    filt_pose.pose.pose.position.y = latest_pose.pose.pose.position.x /scale;
+    filt_pose.pose.pose.position.z = latest_pose.pose.pose.position.z /scale;
+    
+    return filt_pose;
   }
   
-  void publish_scale (const  ros::Publisher& publisher ) {publisher.publish ( scale );}
-  void publish_scaled_pose (const ros::Publisher& publisher ) {publisher.publish ( filt_pose );}
-  void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {orb_data_queue.push_front ( msg );}
-  void set_initial_nav_position (const tf::Vector3& pos ) {init_displacement = pos;}
+  void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ){
+    orb_data_queue.push_front ( msg );
+    latest_pose = msg;
+  }
+//   void set_initial_nav_position (const tf::Vector3& pos ) {init_displacement = pos;}
 };
 
 int main ( int argc, char **argv ) {
@@ -273,13 +283,12 @@ int main ( int argc, char **argv ) {
   ScaleEstimator scale_est;
   
   // subscribe to orb pose and accelerometer data from imu
-  ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orb_callback, &scale_est );
+  ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orbCallback, &scale_est );
   
   // publish scale and filtered orb pose
-  ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled",2 );
+  ros::Publisher scaled_orb_pub = nh.advertise<poseMsgStamped> ( "/orb/pose_scaled",2 );
   
   int rate = 20;
-  int counter = 0;
   ros::Rate loop_rate ( rate );
   
   scale_est.reset();
@@ -287,18 +296,11 @@ int main ( int argc, char **argv ) {
   while ( ros::ok() ) {
     ros::spinOnce();
     
-    if ( counter % 10 == 0 ) {
-      scale_est.process_queue(); 
-      scale_est.estimate_scale();
-      scale_est.reset();
-      counter = 0;
-    }
-    scale_est.set_orb_pose();
-    scale_est.print_all();
-    scale_est.publish_scaled_pose ( filt_orb_pub );
-    
+    scale_est.processQueue();//doesn't do anything if queue size less than 50 
+    scale_est.printAll();
+    poseMsgStamped scale_pose_for_publish = scale_est.getScaledOrbPose();
+    scaled_orb_pub.publish(scale_pose_for_publish);
     loop_rate.sleep();
-    counter++;
   }
   
   return 0;
