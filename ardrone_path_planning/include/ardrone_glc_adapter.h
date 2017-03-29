@@ -145,7 +145,7 @@ public:
     
     dx[0]=x[3];//position in world x-direction
     dx[1]=x[4];//position in world y-direction
-    dx[2]=700*u[2];//position in world z-direction, factor depends on "control_vz_max" from Launchfile: control_vz_max  Here control_vz_max=700 is used
+    dx[2]=0.7*u[2];//position in world z-direction, factor depends on "control_vz_max" from Launchfile: control_vz_max/1000,  Here control_vz_max=700 is used
     dx[3]=u[0]-0.0123*x[3]*x[3];//velocity in world x-direction, factor depends on vx/vy_max ==> "euler_angle_max" from launchfile: 1/sqrt(vmax) Here: v_max = 9m/s
     dx[4]=u[1]-0.0123*x[4]*x[4];//velocity in world y-direction, see above
   }
