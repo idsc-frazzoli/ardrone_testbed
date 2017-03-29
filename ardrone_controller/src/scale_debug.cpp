@@ -189,14 +189,13 @@ public:
     double t;
     
     if(orb_data_queue.empty()){return;}
-    while(orb_data_queue.size()>1){
+    while(orb_data_queue.size()>0){
       //get oldest message
       orb_msg = orb_data_queue.back();
       orb_data_queue.pop_back();
       t = orb_msg.header.stamp.toSec();
       
       if(first_msg){//initialize filters 
-        
         first_msg = false;
         double pole2Hz = 2.0*3.14*0.5;
         double pole5Hz = 2.0*3.14*0.5;
@@ -220,6 +219,7 @@ public:
       orb_z->timeStep(t,orb_msg.pose.pose.position.z);
       
       try {
+        
         tf_listener.lookupTransform ( "odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
         nav_x->timeStep(t,nav_tf.getOrigin().getX());
         nav_y->timeStep(t,nav_tf.getOrigin().getY());
@@ -259,10 +259,10 @@ public:
     filt_pose.pose.pose.position.z = newest_orb_msg.pose.pose.position.z /scale;
   }
   
-  void publish_scale ( ros::Publisher &publisher ) {publisher.publish ( scale );}
-  void publish_scaled_pose ( ros::Publisher &publisher ) {publisher.publish ( filt_pose );}
+  void publish_scale (const  ros::Publisher& publisher ) {publisher.publish ( scale );}
+  void publish_scaled_pose (const ros::Publisher& publisher ) {publisher.publish ( filt_pose );}
   void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {orb_data_queue.push_front ( msg );}
-  void set_initial_nav_position ( tf::Vector3 pos ) {init_displacement = pos;}
+  void set_initial_nav_position (const tf::Vector3& pos ) {init_displacement = pos;}
 };
 
 int main ( int argc, char **argv ) {
