@@ -256,6 +256,11 @@ public:
                if ( first_msg ) { //initialize filters
 
                     first_msg = false;
+		    
+		    // set offset
+		    tf_listener.lookupTransform ( "odom", "/ardrone_base_link_corrected", orb_msg.header.stamp, nav_tf );
+		    set_initial_nav_position(nav_tf.getOrigin());
+		    
                     double pole2Hz = 2.0*3.14*0.5;
                     double pole5Hz = 2.0*3.14*0.5;
 
@@ -362,9 +367,10 @@ public:
           filt_pose.header.frame_id = "odom";
 
           filt_pose.pose.pose.orientation = msg.pose.pose.orientation;
-          filt_pose.pose.pose.position.x = msg.pose.pose.position.x /scale;
-          filt_pose.pose.pose.position.y = msg.pose.pose.position.y /scale;
-          filt_pose.pose.pose.position.z = msg.pose.pose.position.z /scale;
+          filt_pose.pose.pose.position.x = msg.pose.pose.position.x /scale + init_displacement.getX();
+          filt_pose.pose.pose.position.y = msg.pose.pose.position.y /scale + init_displacement.getY();
+          filt_pose.pose.pose.position.z = msg.pose.pose.position.z /scale + init_displacement.getZ();
+     }
      
      void point_cloud_callback ( sensor_msgs::PointCloud msg ) {
           
