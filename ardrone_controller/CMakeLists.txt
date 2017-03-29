@@ -18,11 +18,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   include
  )
- 
-add_service_files(
- FILES
- SendFixedScale.srv
- )
 
 catkin_package(
   INCLUDE_DIRS include
