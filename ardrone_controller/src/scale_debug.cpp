@@ -153,10 +153,12 @@ class ScaleEstimator {
      tf::Vector3 orb_signal;
      tf::Vector3 nav_signal;
      tf::Vector3 init_displacement = tf::Vector3 ( 0,0,0 );
-     geometry_msgs::PoseWithCovarianceStamped filt_pose;
      tf::TransformListener tf_listener;
      deque<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
      vector<ScaleStruct> scale_vector;
+     
+     geometry_msgs::PoseWithCovarianceStamped filt_pose;
+     sensor_msgs::PointCloud scaled_pc;
 
 public:
 
@@ -349,6 +351,10 @@ public:
 	  //printVector("filtered pose: ", filt_pose);
           publisher.publish ( filt_pose );
      }
+     void publish_scaled_point_cloud( ros::Publisher &publisher) {
+	  publisher.publish ( scaled_pc );
+	  scaled_pc.points.clear();
+     }
      void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
           orb_data_queue.push_front ( msg );
 
@@ -359,11 +365,28 @@ public:
           filt_pose.pose.pose.position.x = msg.pose.pose.position.x /scale;
           filt_pose.pose.pose.position.y = msg.pose.pose.position.y /scale;
           filt_pose.pose.pose.position.z = msg.pose.pose.position.z /scale;
+     
+     void point_cloud_callback ( sensor_msgs::PointCloud msg ) {
+          
+          scaled_pc.header.stamp = msg.header.stamp;
+          scaled_pc.header.frame_id = "/first_keyframe_cam";
+	  
+	  for (int i =0; i < msg.points.size(); i++)
+	  {
+	    geometry_msgs::Point32 point;
+	    point.x = msg.points[i].x / scale;
+	    point.y = msg.points[i].y / scale;
+	    point.z = msg.points[i].z / scale;
+	    
+	    scaled_pc.points.push_back(point);
+	  }
      }
      
      void set_initial_nav_position ( tf::Vector3 pos ) {
           init_displacement = pos;
      }
+     
+     bool has_fixed_scale() {return fixed_scale;}
 };
 
 int main ( int argc, char **argv )
@@ -379,13 +402,16 @@ int main ( int argc, char **argv )
 
      // get rotation due to magnetic field
      ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 10, &ScaleEstimator::nav_callback, &scale_est );
-
-     // publish scale and filtered orb pose
-     ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled", 10 );
      
-     // create service to transmit scale to orb when scale has been fixed
-     ros::ServiceClient scale_serv = nh.advertiseService<>()
+     // get point cloud for scaling
+     ros::Subscriber pc_sub = nh.subscribe ( "/orb/point_cloud", 10, &ScaleEstimator::point_cloud_callback, &scale_est );
 
+     // publish scaled  orb pose
+     ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled", 10 );
+
+     // publish scaled point cloud
+     ros::Publisher pc_orb_pub = nh.advertise<sensor_msgs::PointCloud> ( "/orb/point_cloud_scaled", 10 );
+     
      int rate = 20;
      int counter = 0;
      ros::Rate loop_rate ( rate );
@@ -403,6 +429,8 @@ int main ( int argc, char **argv )
           }
           //scale_est.print_all();
           scale_est.publish_scaled_pose ( filt_orb_pub );
+	  
+	  if (scale_est.has_fixed_scale()) {scale_est.publish_scaled_point_cloud (pc_orb_pub);}
 
           loop_rate.sleep();
           counter++;
