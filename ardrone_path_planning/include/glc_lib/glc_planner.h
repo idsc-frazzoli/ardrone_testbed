@@ -72,10 +72,7 @@ namespace glc{
       //h(R)
       depth_limit=params.depth_scale*params.res*floor(log(params.res));
       //eta(R) \in \little-omega (log(R)*R^L_f)
-      eta = log(params.res)*pow(params.res,dynamics->getLipschitzConstant())/( params.partition_scale );
-      partition_scale=eta/( params.partition_scale );
-
-      if(dynamics->getLipschitzConstant()==0.0){
+     if(dynamics->getLipschitzConstant()==0.0){
         eta = params.res*log(params.res)*log(params.res)/params.partition_scale;
       }
       else{
