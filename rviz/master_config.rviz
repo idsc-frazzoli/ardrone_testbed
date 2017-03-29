@@ -182,8 +182,8 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Alpha: 1
-      Axes Length: 1
-      Axes Radius: 0.100000001
+      Axes Length: 0.5
+      Axes Radius: 0.0500000007
       Class: rviz_plugin_covariance/PoseWithCovariance
       Color: 234; 0; 255
       Covariance:
@@ -207,8 +207,8 @@ Visualization Manager:
       Name: PoseWithCovariance
       Shaft Length: 1
       Shaft Radius: 0.0500000007
-      Shape: Arrow
-      Topic: ""
+      Shape: Axes
+      Topic: /orb/pose_scaled
       Unreliable: false
       Value: false
     - Class: rviz/Marker

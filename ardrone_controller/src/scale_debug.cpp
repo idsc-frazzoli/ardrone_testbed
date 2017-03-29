@@ -12,6 +12,7 @@
 #include <tf/transform_listener.h>
 #include <tf/LinearMath//Vector3.h>
 #include <tf/tfMessage.h>
+#include <tf/transform_broadcaster.h>
 #include <linear_system.h>
 
 using namespace std;
@@ -89,6 +90,16 @@ class ScaleEstimator {
   bool first_msg;
   bool fixed_scale = false;
   float scale = 1; // has units m^-1
+  float scale_ubound = 1;
+  float scale_lbound = 1;
+  
+  // nav data correction
+  bool quat_init = false;
+  bool correction_made = false;
+  tf::StampedTransform T_init, T_curr, T_prev;
+  tf::Transform T_correction;
+  tf::TransformBroadcaster br;
+  
   // tuning parameters
   const float orb_noise=0.2, nav_noise=0.01; // noise params must be tuned (init vals from tum)
   const float dot_prod_tol = 0.05;
@@ -104,9 +115,12 @@ class ScaleEstimator {
   
 public:
   
-  ScaleEstimator():orb_signal(0,0,0),nav_signal(0,0,0),first_msg(true){}
-  
-  
+  ScaleEstimator():orb_signal(0,0,0),nav_signal(0,0,0),first_msg(true){
+    T_init.setIdentity();
+    T_prev.setIdentity();
+    T_curr.setIdentity();
+    T_correction.setIdentity();
+  }
   
 //   tf::Vector3 orb_displacement = tf::Vector3 ( 0,0,0 );
 //   tf::Vector3 nav_data_displacement = tf::Vector3 ( 0,0,0 );
@@ -137,19 +151,7 @@ public:
     double sumII = 0;
     double sumPP = 0;
     double sumPI = 0;
-    double totSumII = 0;
-    double totSumPP = 0;
-    double totSumPI = 0;
-    
-    double sumIIxy = 0;
-    double sumPPxy = 0;
-    double sumPIxy = 0;
-    double sumIIz = 0;
-    double sumPPz = 0;
-    double sumPIz = 0;
-    
-    int numIn = 0;
-    int numOut = 0;
+
     int count = 0;
     
     for(unsigned int i=0;i<scale_vector.size();i++){
@@ -157,32 +159,36 @@ public:
         sumII += scale_vector[i].ii;
         sumPP += scale_vector[i].pp;
         sumPI += scale_vector[i].pi;
-        
-        sumIIxy += scale_vector[i].imu[0]*scale_vector[i].imu[0] + scale_vector[i].imu[1]*scale_vector[i].imu[1];
-        sumPPxy += scale_vector[i].ptam[0]*scale_vector[i].ptam[0] + scale_vector[i].ptam[1]*scale_vector[i].ptam[1];
-        sumPIxy += scale_vector[i].ptam[0]*scale_vector[i].imu[0] + scale_vector[i].ptam[1]*scale_vector[i].imu[1];
-        
-        sumIIz += scale_vector[i].imu[2]*scale_vector[i].imu[2];
-        sumPPz += scale_vector[i].ptam[2]*scale_vector[i].ptam[2];
-        sumPIz += scale_vector[i].ptam[2]*scale_vector[i].imu[2];
+	
         count++;
-      }
-      else{
-        totSumII += scale_vector[i].ii;
-        totSumPP += scale_vector[i].pp;
-        totSumPI += scale_vector[i].pi;
       }
     }
     fixed_scale = fixed_scale or count > scale_samples;
     
-    if (not fixed_scale){scale = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, orb_noise,nav_noise);} 
+    if (not fixed_scale)
+    {
+      scale_ubound = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, .0001,10000);
+      scale_lbound = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, 100,.01);
+      scale = ScaleStruct::computeEstimator(sumPP,sumII,sumPI, orb_noise,nav_noise);
+    } 
     else{cout << "scale fixed" << endl;}
   }
   
-  void printAll(){       
-    cout << endl << endl;
-    cout << "scale: " << "\t" << scale << endl;
-    cout << "scaled pose x:" << "\t" << filt_pose.pose.pose.position.x  <<endl;
+  void printAll(){      
+    float cur_orb_x = filt_pose.pose.pose.position.x / scale; 
+    float cur_orb_y = filt_pose.pose.pose.position.y / scale; 
+    float cur_orb_z = filt_pose.pose.pose.position.z / scale;
+    
+    tf::Vector3 u_bound_pos = tf::Vector3(cur_orb_x * scale_ubound, cur_orb_y * scale_ubound, cur_orb_z * scale_ubound);
+    tf::Vector3 l_bound_pos = tf::Vector3(cur_orb_x * scale_lbound, cur_orb_y * scale_lbound, cur_orb_z * scale_lbound);
+    
+    cout << endl;
+    
+    cout << "lower s: " << scale_lbound << "\t s: " << scale << "\t upper s: " << scale_ubound << endl;
+    
+    printVector("position lbound", l_bound_pos);
+    printVector("position ubound", u_bound_pos);
+    printVector("position", filt_pose);
   }
   
   //This gets called at every iteration of the ros loop
@@ -224,11 +230,10 @@ public:
       orb_y->timeStep(t,orb_msg.pose.pose.position.y);
       orb_z->timeStep(t,orb_msg.pose.pose.position.z);
       
-      if( tf_listener.waitForTransform( "/odom", "/ardrone_base_link",orb_msg.header.stamp,
+      if( tf_listener.waitForTransform( "/odom", "/ardrone_base_link_corrected",orb_msg.header.stamp,
         ros::Duration(1.0),ros::Duration(0.1))){
       try {
-        
-        tf_listener.lookupTransform ( "/odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
+        tf_listener.lookupTransform ( "odom", "/ardrone_base_link_corrected", orb_msg.header.stamp, nav_tf );
         nav_x->timeStep(t,nav_tf.getOrigin().getX());
         nav_y->timeStep(t,nav_tf.getOrigin().getY());
         nav_z->timeStep(t,nav_tf.getOrigin().getZ());
@@ -262,7 +267,7 @@ public:
     
     filt_pose.pose.pose.orientation = latest_pose.pose.pose.orientation;
     filt_pose.pose.pose.position.x = latest_pose.pose.pose.position.x /scale;
-    filt_pose.pose.pose.position.y = latest_pose.pose.pose.position.x /scale;
+    filt_pose.pose.pose.position.y = latest_pose.pose.pose.position.y /scale;
     filt_pose.pose.pose.position.z = latest_pose.pose.pose.position.z /scale;
     
     return filt_pose;
@@ -272,7 +277,40 @@ public:
     orb_data_queue.push_front ( msg );
     latest_pose = msg;
   }
-//   void set_initial_nav_position (const tf::Vector3& pos ) {init_displacement = pos;}
+  void nav_callback ( ardrone_autonomy::Navdata navdata ) {
+    float deg_to_rad = 3.14159 / 180;
+    
+    // get current frame
+    try 
+    {
+      tf_listener.lookupTransform("odom", "/ardrone_base_link", navdata.header.stamp, T_curr);
+      T_curr.setOrigin(tf::Vector3(0,0,0));
+    }
+    catch (tf2::ExtrapolationException e) {cout << e.what() << endl;}
+    
+    
+    // initialize previous frame
+    if ( not quat_init) { T_init = T_prev = T_curr; quat_init = true;} 
+    
+    if (not correction_made) 
+    {
+      // calculate correction transformation
+      tf::Transform delta_T = T_curr.inverse() * T_prev;
+      
+      // if angle jump is too large then assign the correction transform
+      float angle_deg = delta_T.getRotation().getAngle() / deg_to_rad;
+      if (abs(angle_deg) > 5) { T_correction = T_curr.inverse() * T_init; correction_made = true;}
+      
+      T_prev = T_curr;
+    }
+    
+    // publish corrected frame
+    br.sendTransform(tf::StampedTransform(T_correction, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected"));
+  }
+  
+//   void publish_scale ( ros::Publisher &publisher ) {publisher.publish ( scale );}
+//   void publish_scaled_pose ( ros::Publisher &publisher ) {publisher.publish ( filt_pose );}
+//   void set_initial_nav_position ( tf::Vector3 pos ) {init_displacement = pos;}
 };
 
 int main ( int argc, char **argv ) {
@@ -284,6 +322,9 @@ int main ( int argc, char **argv ) {
   
   // subscribe to orb pose and accelerometer data from imu
   ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orbCallback, &scale_est );
+  
+  // get rotation due to magnetic field
+  ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 10, &ScaleEstimator::nav_callback, &scale_est );
   
   // publish scale and filtered orb pose
   ros::Publisher scaled_orb_pub = nh.advertise<poseMsgStamped> ( "/orb/pose_scaled",2 );
