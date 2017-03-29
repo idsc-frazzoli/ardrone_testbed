@@ -10,7 +10,6 @@ Panels:
         - /TF1/Frames1
         - /TF1/Tree1
         - /PointCloud1
-        - /PointCloud1/Status1
         - /PointCloud1/Autocompute Value Bounds1
         - /PoseWithCovariance1
         - /Marker1
@@ -63,25 +62,25 @@ Visualization Manager:
       Frames:
         All Enabled: false
         ardrone_base_bottomcam:
-          Value: true
+          Value: false
         ardrone_base_frontcam:
-          Value: true
+          Value: false
         ardrone_base_link:
-          Value: true
+          Value: false
         first_keyframe_base_link:
-          Value: true
+          Value: false
         first_keyframe_cam:
-          Value: true
+          Value: false
         odom:
-          Value: true
+          Value: false
         orb_pose_unscaled:
-          Value: true
+          Value: false
         orb_pose_unscaled_cam:
           Value: true
         second_keyframe_base_link:
-          Value: true
+          Value: false
         second_keyframe_cam:
-          Value: true
+          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -155,8 +154,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 0.942640185
-        Min Value: -1.54418468
+        Max Value: 1.40655315
+        Min Value: -0.744894505
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -243,25 +242,25 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz/Orbit
-      Distance: 42.9421082
+      Class: rviz/ThirdPersonFollower
+      Distance: 2.46282387
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 3.14386201
-        Y: -1.32241237
-        Z: 13.3110304
-      Focal Shape Fixed Size: false
+        X: 0.0935003757
+        Y: 0.742239118
+        Z: 1.06597827e-06
+      Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 1.13039756
+      Pitch: 0.065398246
       Target Frame: odom
-      Value: Orbit (rviz)
-      Yaw: 3.10539937
+      Value: ThirdPersonFollower (rviz)
+      Yaw: 2.10040498
     Saved: ~
 Window Geometry:
   Displays:
