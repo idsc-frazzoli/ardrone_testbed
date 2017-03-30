@@ -129,11 +129,6 @@ int main ( int argc, char **argv ) {
     return 0;
 }
 
-//callback
-void ImageGrabber::SetScale ( std_msgs::Float32 scale ) {
-    scale = scale;
-}
-
 void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
 
     // Copy the ros image message to cv::Mat.
