@@ -248,7 +248,7 @@ public:
             if ( first_msg ) { //initialize filters
                 first_msg = false;
 
-                set_initial_nav_position ( nav_tf.getOrigin() );
+                setInitialPosition ( nav_tf.getOrigin() );
 
                 double pole2Hz = 2.0*3.14*0.5;
                 double pole5Hz = 2.0*3.14*0.5;
@@ -327,7 +327,7 @@ public:
         latest_pose = msg;
     }
 
-    void nav_callback ( ardrone_autonomy::Navdata navdata ) {
+    void navCallback ( ardrone_autonomy::Navdata navdata ) {
         float deg_to_rad = 3.14159 / 180;
 
         // get current frame
@@ -362,27 +362,15 @@ public:
         br.sendTransform ( tf::StampedTransform ( T_correction, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected" ) );
     }
 
-    void point_cloud_callback ( sensor_msgs::PointCloud msg ) {
-        scaled_pc.header.frame_id = "/first_keyframe_cam";
-        scaled_pc.header.stamp = msg.header.stamp;
-
-        for ( int i =0; i < msg.points.size(); i++ ) {
-            geometry_msgs::Point32 point;
-            point.x = msg.points[i].x / scale;
-
-            point.z = msg.points[i].z / scale;
-            point.y = msg.points[i].y / scale;
-        }
-        scaled_pc.points.push_back ( point );
-    }
-
-    void set_initial_nav_position ( tf::Vector3 pos ) {
+    void setInitialPosition ( tf::Vector3 pos ) {
         init_displacement = pos;
     }
 
-    bool has_fixed_scale() {
+    bool hasFixedScale() {
         return fixed_scale;
     }
+    
+    float getScale() { return scale;}
 };
 
 
@@ -397,10 +385,13 @@ int main ( int argc, char **argv ) {
     ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orbCallback, &scale_est );
 
     // get rotation due to magnetic field
-    ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 10, &ScaleEstimator::nav_callback, &scale_est );
-
-    // publish scale and filtered orb pose
-    ros::Publisher scaled_orb_pub = nh.advertise<poseMsgStamped> ( "/orb/pose_scaled",2 );
+    ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 10, &ScaleEstimator::navCallback, &scale_est );
+ 
+    // publish filtered orb pose
+    ros::Publisher scaled_orb_pub = nh.advertise<poseMsgStamped> ( "/scale_estimator/pose_scaled",2 );
+		
+		// publish scale
+		ros::Publisher scale_pub = nh.advertise<std_msgs::Float32> ("/scale_estimator/scale", 1);
 
     int rate = 20;
     ros::Rate loop_rate ( rate );
@@ -409,10 +400,19 @@ int main ( int argc, char **argv ) {
         ros::spinOnce();
 
         scale_est.processQueue();//doesn't do anything if queue size less than 50
-        scale_est.printAll();
-        poseMsgStamped scale_pose_for_publish = scale_est.getScaledOrbPose();
-        scaled_orb_pub.publish ( scale_pose_for_publish );
-        loop_rate.sleep();
+				scale_est.printAll();
+        
+				std_msgs::Float32 scale_for_publish;
+				poseMsgStamped scale_pose_for_publish = scale_est.getScaledOrbPose();
+				
+				if (scale_est.hasFixedScale()) {
+						scale_for_publish.data = scale_est.getScale();
+						scale_pub.publish(scale_for_publish);
+				}
+				
+				scaled_orb_pub.publish ( scale_pose_for_publish );
+        
+				loop_rate.sleep();
     }
 
     return 0;
