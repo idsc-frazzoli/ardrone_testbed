@@ -18,7 +18,7 @@ class ScaleEstimator
 {
 public:
     float scale = 1; // has units m^-1
-    float sxx=0, syy=0, sxy=0, orb_noise=2, nav_noise=0.5, xx, xy; // noise params must be tuned (init vals from tum)
+    float sxx=0, syy=0, sxy=0, orb_noise=0.01, nav_noise=0.1, xx, xy; // noise params must be tuned (init vals from tum)
 
     tf::Vector3 orb_displacement = tf::Vector3(0,0,0);
     tf::Vector3 nav_data_displacement = tf::Vector3(0,0,0);
@@ -29,6 +29,7 @@ public:
     bool isBadReading = false;
     bool isDominantVy = true;
     
+		
     
     geometry_msgs::PoseWithCovarianceStamped filt_pose;
     tf::Vector3 filt_position;
@@ -37,6 +38,8 @@ public:
     tf::TransformListener tf_listener;
     vector<double> scale_vector;
     vector<int> messageIndex;
+		vector<double> orbAverages;
+		vector<double> altAverages;
     tf::Vector3 curr_orb_position; 
     
     vector<ardrone_autonomy::Navdata> nav_data_queue;
@@ -89,11 +92,16 @@ public:
         }
 
         void estimate_scale() {	
-	  
+					
+					//do the MLE estimator for 1 dimension
+					
+					double deltaX = ( (orbAverages[0] + orbAverages[1] + orbAverages[2] ) - (orbAverages[3] + orbAverages[4] + orbAverages[5] ) ) / 3 ;
+					double deltaY = ( (altAverages[0] + altAverages[1] + altAverages[2] ) - (altAverages[3] + altAverages[4] + altAverages[5] ) ) / 3 ;
+					scale_vector.push_back( deltaX / deltaY );
             // update sxx, sxy, syy
-            sxx += pow(nav_noise,2) * orb_displacement.length2();
-            syy += pow(orb_noise,2) * nav_data_displacement.length2();
-            sxy += nav_noise * orb_noise * orb_displacement.dot ( nav_data_displacement );
+            sxx += pow(nav_noise,2) * deltaX;
+            syy += pow(orb_noise,2) * deltaY;
+            sxy += nav_noise * orb_noise * deltaX*deltaY;
 
             // update scale and filtered position
 	    if (not sxy == 0){
@@ -103,6 +111,11 @@ public:
 	    else{
 	      cout << "Encountered numerical instability - no scale update!" << endl;
 	    }
+	    
+	    std::sort(scale_vector.begin() ,scale_vector.end() );
+			scale = scale_vector[scale_vector.size() / 2];
+			
+			cout << "median scale: " << scale << endl;
 
 
 // 	  orb_displacement.setZ(0);
@@ -159,86 +172,119 @@ public:
 	<< "Y: " << filt_pose.pose.pose.position.y << endl 		//debug
 	<< "Z: " << filt_pose.pose.pose.position.z << endl;
 	}
+	double get_average_z(vector<ardrone_autonomy::Navdata> &queue){
+		double data = 0;
+		int counter = 0;
+		for(counter ; counter < queue.size() ; counter++ ){
+			data += queue[counter].altd;
+		}
+		return data / counter / 1000;
+	}
 	
+	double get_average_z(vector<geometry_msgs::PoseWithCovarianceStamped> &queue){
+		double data = 0;
+		int counter = 0;
+		for(counter ; counter < queue.size() ; counter++ ){
+			data += queue[counter].pose.pose.position.z;
+		}
+		return data / counter;
+	}
 	
   void process_queue()
   {
-    ros::Time t_oldest, t_newest, t_mid;
-    ardrone_autonomy::Navdata oldest_navdata_msg, newest_navdata_msg;
-    tf::StampedTransform old_base_link_to_odom, new_base_link_to_odom;
-    
-    // process orb
-      
-      geometry_msgs::PoseWithCovarianceStamped oldest_orb_msg, mid_orb_msg;
-      
-      //orb: simply get the oldest and newest message in the queue
-      //in the optimal case there are only two messages but this covers all cases anyway
-      
-      oldest_orb_msg = orb_data_queue.front();
-      mid_orb_msg = orb_data_queue[orb_data_queue.size() / 2];		//median
-      newest_orb_msg = orb_data_queue.back();
-      
-      //nav-data: try to average over an intervall of 4 messages around the orb message
-      //to reduce the chance of hitting an outlier
-      //for such a small intervall (20 millisec) the velocity can be assumed to be constant 
-      
-      //ugly but only for testing
-//       int orb_messages = 0;
-//       for (int index = 0; index < messageIndex.size() ; index++)
-//       {
-// 	if(messageIndex[index] == 1)
-// 	  orb_messages++;
-//       }
+		
+		orbAverages.push_back(get_average_z(orb_data_queue));
+		altAverages.push_back(get_average_z(nav_data_queue));
+		
+		
+		
+
+		
+		
+		
+		
+		
+		
+
+		
+		
+		
+		
+//     ros::Time t_oldest, t_newest;
+//     ardrone_autonomy::Navdata oldest_navdata_msg, newest_navdata_msg;
+//     tf::StampedTransform old_base_link_to_odom, new_base_link_to_odom;
+//     
+//     // process orb
+//       
+//       geometry_msgs::PoseWithCovarianceStamped oldest_orb_msg, mid_orb_msg;
+//       
+//       //orb: simply get the oldest and newest message in the queue
+//       //in the optimal case there are only two messages but this covers all cases anyway
+//       
+//       oldest_orb_msg = orb_data_queue.front();
+//       mid_orb_msg = orb_data_queue[orb_data_queue.size() / 2];		//median
+       newest_orb_msg = orb_data_queue.back();
+//       
+//       //nav-data: try to average over an intervall of 4 messages around the orb message
+//       //to reduce the chance of hitting an outlier
+//       //for such a small intervall (20 millisec) the velocity can be assumed to be constant 
+//       
+//       //ugly but only for testing
+// //       int orb_messages = 0;
+// //       for (int index = 0; index < messageIndex.size() ; index++)
+// //       {
+// // 	if(messageIndex[index] == 1)
+// // 	  orb_messages++;
+// //       }
+// //       
+// // 
+// //       oldest_navdata_msg = nav_data_queue[];
+//       
+//       t_oldest = oldest_orb_msg.header.stamp;
+//       t_mid = mid_orb_msg.header.stamp;
+//       t_newest = newest_orb_msg.header.stamp;
+//          
+//       double x, y, z, xnew, ynew, znew, xold, yold, zold;
+//       xnew = newest_orb_msg.pose.pose.position.x;
+//       ynew = newest_orb_msg.pose.pose.position.y; 
+//       znew = newest_orb_msg.pose.pose.position.z;
+//       
+//       x = mid_orb_msg.pose.pose.position.x;
+//       y = mid_orb_msg.pose.pose.position.y; 
+//       z = mid_orb_msg.pose.pose.position.z;
+//       
+//       xold = oldest_orb_msg.pose.pose.position.x;
+//       yold = oldest_orb_msg.pose.pose.position.y; 
+//       zold = oldest_orb_msg.pose.pose.position.z;
 //       
 // 
-//       oldest_navdata_msg = nav_data_queue[];
-      orb_accel = /
-      
-      t_oldest = oldest_orb_msg.header.stamp;
-      t_mid = mid_orb_msg.header.stamp;
-      t_newest = newest_orb_msg.header.stamp;
-         
-      double x, y, z, xnew, ynew, znew, xold, yold, zold;
-      xnew = newest_orb_msg.pose.pose.position.x;
-      ynew = newest_orb_msg.pose.pose.position.y; 
-      znew = newest_orb_msg.pose.pose.position.z;
-      
-      x = mid_orb_msg.pose.pose.position.x;
-      y = mid_orb_msg.pose.pose.position.y; 
-      z = mid_orb_msg.pose.pose.position.z;
-      
-      xold = oldest_orb_msg.pose.pose.position.x;
-      yold = oldest_orb_msg.pose.pose.position.y; 
-      zold = oldest_orb_msg.pose.pose.position.z;
-      
-
-      orb_displacement = tf::Vector3(dx,dy,dz);    
-      orb_orientation = tf::Quaternion(newest_orb_msg.pose.pose.orientation.x,
-				       newest_orb_msg.pose.pose.orientation.y,
-				       newest_orb_msg.pose.pose.orientation.z,
-				       newest_orb_msg.pose.pose.orientation.w);
-
-       //process navda queue
-
-// 	try {
+//       //orb_displacement = tf::Vector3(dx,dy,dz);    
+//       orb_orientation = tf::Quaternion(newest_orb_msg.pose.pose.orientation.x,
+// 				       newest_orb_msg.pose.pose.orientation.y,
+// 				       newest_orb_msg.pose.pose.orientation.z,
+// 				       newest_orb_msg.pose.pose.orientation.w);
 // 
-// 	tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_oldest, old_base_link_to_odom );
-// 	tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_newest, new_base_link_to_odom );
-// 	
-// 	  
-// 	} catch (tf2::ExtrapolationException e) {
-// 	  cout << e.what() << endl << "Transform lookup failed: Taking latest transformation" << endl;
-// 	  tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_oldest, old_base_link_to_odom );
-// 	  tf_listener.lookupTransform ( "odom", "/ardrone_base_link", ros::Time(0), new_base_link_to_odom );
-// 	}  
+//        //process navda queue
 // 
-// 	tf::Vector3 navda_displacement = tf::Vector3(0,0,0);
-// 	navda_displacement = new_base_link_to_odom.getOrigin() - old_base_link_to_odom.getOrigin();
-// 	
-// 	if( ( abs(navda_displacement.dot(orb_displacement)) / orb_displacement.length() ) < 0.05  )
-// 	  isBadReading = true;
-// 	
-// 	nav_data_displacement = navda_displacement;
+// // 	try {
+// // 
+// // 	tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_oldest, old_base_link_to_odom );
+// // 	tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_newest, new_base_link_to_odom );
+// // 	
+// // 	  
+// // 	} catch (tf2::ExtrapolationException e) {
+// // 	  cout << e.what() << endl << "Transform lookup failed: Taking latest transformation" << endl;
+// // 	  tf_listener.lookupTransform ( "odom", "/ardrone_base_link", t_oldest, old_base_link_to_odom );
+// // 	  tf_listener.lookupTransform ( "odom", "/ardrone_base_link", ros::Time(0), new_base_link_to_odom );
+// // 	}  
+// // 
+// // 	tf::Vector3 navda_displacement = tf::Vector3(0,0,0);
+// // 	navda_displacement = new_base_link_to_odom.getOrigin() - old_base_link_to_odom.getOrigin();
+// // 	
+// // 	if( ( abs(navda_displacement.dot(orb_displacement)) / orb_displacement.length() ) < 0.05  )
+// // 	  isBadReading = true;
+// // 	
+// // 	nav_data_displacement = navda_displacement;
 
   } 
 
@@ -254,12 +300,12 @@ public:
   
   void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
       orb_data_queue.push_back(msg);
-      messageIndex.push_back(1);
+      //messageIndex.push_back(1);
     }
     
   void nav_data_callback ( ardrone_autonomy::Navdata msg ) {
 	nav_data_queue.push_back(msg);
-	messageIndex.push_back(0);
+	//messageIndex.push_back(0);
 	
     }
   
@@ -284,46 +330,44 @@ public:
 	int rate = 60;
         ros::Rate loop_rate ( rate );
 	cout << "Started scale estimation with rate " << rate << " Hz" << endl; 
-	
-	scale_est.reset_all();
 
         while ( ros::ok() ) {	  
-            ros::spinOnce();
 
-	    if (scale_est.orb_data_queue.size() > 2){	//minimum orb poses for estimation is 2
-	      loop_rate.sleep();
-	      ros::spinOnce();
+	    if (scale_est.orb_data_queue.size() > 0){
 	      
-	      loop_rate.sleep();
-	      ros::spinOnce();				//spin twice to make sure enough nav_data messages are added
-	      
+				ros::spinOnce();
+				loop_rate.sleep();
+				
+				ros::spinOnce();
+				loop_rate.sleep();
+										
 	      scale_est.process_queue();
 	    
-	      scale_est.estimate_scale(); 
-	      
-	      scale_est.estimate_pose(); 
-	      
-	      scale_est.publish_scale(orb_scale_pub);
-	      
-	      scale_est.publish_scaled_pose(filt_orb_pub);
-	      
-	      cout << "Message indices: " << scale_est.messageIndex.size()  << endl;
-	      for (int i = 0 ; i < scale_est.messageIndex.size() ;i++ )
-		cout << scale_est.messageIndex[i] << endl;
-	      
-	      scale_est.reset_all();
-	      
-	      loop_rate.sleep();			//spin to make sure enough nav_data messages are saved before first orb pose
-	      ros::spinOnce();
+				if (scale_est.orbAverages.size() > 5){
+					scale_est.estimate_scale(); 
+					scale_est.estimate_pose(); 
+					
+					scale_est.publish_scale(orb_scale_pub);
+					scale_est.publish_scaled_pose(filt_orb_pub);
+					
+					scale_est.orbAverages.clear();
+					scale_est.altAverages.clear();
+					
+		      scale_est.reset_all();
+				}
+// 	      cout << "Message indices: " << scale_est.messageIndex.size()  << endl;
+// 	      for (int i = 0 ; i < scale_est.messageIndex.size() ;i++ )
+// 				cout << scale_est.messageIndex[i] << endl;
 	    }
+	    ros::spinOnce();
+			loop_rate.sleep();
 	    
             // TODO: debug
-            std_msgs::Float32 scale = scale_est.get_scale();
+      std_msgs::Float32 scale = scale_est.get_scale();
 	    geometry_msgs::PoseWithCovarianceStamped scaled_orb_pose = scale_est.get_scaled_pose();
 
-            loop_rate.sleep();
-        }
-
-        return 0;
     }
+
+    return 0;
+	}
 
