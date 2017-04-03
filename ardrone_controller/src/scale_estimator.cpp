@@ -81,6 +81,8 @@ public:
     void estimate_scale() {	
      
      if (scale_vector.size() > 120) return; //enough scales for accuracy
+     
+     if(orbAverages.size() != altAverages.size()) return;
 
      cout << "reestimating scale..." << endl; 
      
