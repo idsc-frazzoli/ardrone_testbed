@@ -16,10 +16,12 @@ using namespace std;
 class ScaleEstimator {
     public:
     float scale = 1; // has units m^-1
+    bool isStarted = false;
 
     tf::Vector3 filt_position;
     tf::Quaternion orb_orientation;
-    tf::TransformListener tf_listener;
+    tf::Quaternion yaw_correction_quat;
+    tf::StampedTransform yaw_correction_before_jump_tf;
     tf::Vector3 curr_orb_position;
 
     vector<double> scale_vector;
@@ -28,6 +30,7 @@ class ScaleEstimator {
 
     vector<ardrone_autonomy::Navdata> nav_data_queue;
     vector<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
+    tf::TransformListener tf_listener;
 
     geometry_msgs::PoseWithCovarianceStamped newest_orb_msg;
     geometry_msgs::PoseWithCovarianceStamped filt_pose;
@@ -49,30 +52,7 @@ class ScaleEstimator {
         return data / counter;
     }
 
-    geometry_msgs::PoseWithCovarianceStamped get_scaled_pose() {
-
-        geometry_msgs::PoseWithCovarianceStamped pose_out;
-
-        pose_out.pose.pose.position.x = curr_orb_position.x() / scale;
-        pose_out.pose.pose.position.y = curr_orb_position.y() / scale;
-        pose_out.pose.pose.position.z = curr_orb_position.z() / scale;
-
-        pose_out.pose.pose.orientation.x = orb_orientation.getX();
-        pose_out.pose.pose.orientation.y = orb_orientation.getY();
-        pose_out.pose.pose.orientation.z = orb_orientation.getZ();
-        pose_out.pose.pose.orientation.w = orb_orientation.getW();
-
-        pose_out.header.frame_id = "odom";
-
-        pose_out.header.stamp = ros::Time::now();
-
-        return pose_out;
-
-    }
-
     void reset_all() {
-        cout << "====================== reset ====================" << endl;
-
         nav_data_queue.clear();
         orb_data_queue.clear();
     }
@@ -91,11 +71,14 @@ class ScaleEstimator {
 
         cout << "reestimating scale..." << endl;
 
-        double deltaX = ( ( orbAverages[0] + orbAverages[1] + orbAverages[2] ) - ( orbAverages[3] + orbAverages[4] + orbAverages[5] ) ) / 3 ;
-        double deltaY = ( ( altAverages[0] + altAverages[1] + altAverages[2] ) - ( altAverages[3] + altAverages[4] + altAverages[5] ) ) / 3 ;
+        double deltaX = ( ( orbAverages[0] + orbAverages[1] + orbAverages[2] ) -
+                          ( orbAverages[3] + orbAverages[4] + orbAverages[5] ) ) / 3 ;
+        double deltaY = ( ( altAverages[0] + altAverages[1] + altAverages[2] ) -
+                          ( altAverages[3] + altAverages[4] + altAverages[5] ) ) / 3 ;
         double naive_scale = deltaX / deltaY;
 
-        if ( naive_scale == naive_scale && naive_scale > 0 ) {
+        if ( naive_scale == naive_scale && naive_scale > 0 ) { //covers for nan/inf and bad readings (negative scale)
+            cout << "pushing back scale vector" << endl;
             scale_vector.push_back ( naive_scale );   //naive scale
             std::sort ( scale_vector.begin() ,scale_vector.end() );
         }
@@ -108,17 +91,28 @@ class ScaleEstimator {
             }
             scale = scale_accumulated / samples;
         } else {
-            scale = scale_vector[scale_vector.size() / 2]; //return simple median for first few readings
+            if ( scale_vector.size() == 0 ) {
+                return;
+            }
+            scale = scale_vector[scale_vector.size() / 2]; // simple median for first few readings
         }
         cout << "naive scale: " << scale << endl;
     }
     void estimate_pose() {
-        filt_position.setX ( newest_orb_msg.pose.pose.position.x );
-        filt_position.setY ( newest_orb_msg.pose.pose.position.y );
-        filt_position.setZ ( newest_orb_msg.pose.pose.position.z );
+        if ( not isStarted ) return;
+
+        //cout << "orb: " << orb_orientation.getX() << endl << orb_orientation.getY() << endl << orb_orientation.getZ() << endl << orb_orientation.getW() << endl;
+        //cout << "yaw: " << yaw_correction_quat.getX() << endl << yaw_correction_quat.getY() << endl << yaw_correction_quat.getZ() << endl << yaw_correction_quat.getW() << endl;
 
         filt_pose.header.frame_id = "odom";
         filt_pose.header.stamp = ros::Time::now();
+
+        orb_orientation.setX ( newest_orb_msg.pose.pose.orientation.x );
+        orb_orientation.setY ( newest_orb_msg.pose.pose.orientation.y );
+        orb_orientation.setZ ( newest_orb_msg.pose.pose.orientation.z );
+        orb_orientation.setW ( newest_orb_msg.pose.pose.orientation.w );
+
+        orb_orientation =  orb_orientation * yaw_correction_quat;
 
         // orientation
         filt_pose.pose.pose.orientation.x = orb_orientation.getX();
@@ -127,9 +121,13 @@ class ScaleEstimator {
         filt_pose.pose.pose.orientation.w = orb_orientation.getW();
 
         // position
-        filt_pose.pose.pose.position.x = filt_position.getX() / scale;
-        filt_pose.pose.pose.position.y = filt_position.getY() / scale;
-        filt_pose.pose.pose.position.z = filt_position.getZ() / scale;
+        filt_pose.pose.pose.position.x = newest_orb_msg.pose.pose.position.x / scale;
+        filt_pose.pose.pose.position.y = newest_orb_msg.pose.pose.position.y / scale;
+        filt_pose.pose.pose.position.z = newest_orb_msg.pose.pose.position.z / scale;
+
+        for ( auto & x : filt_pose.pose.covariance ) {
+            x = 0.0;
+        }
 
         cout << "SCALED POSITION: " << endl
         << "X: " << filt_pose.pose.pose.position.x << endl
@@ -137,21 +135,40 @@ class ScaleEstimator {
         << "Z: " << filt_pose.pose.pose.position.z << endl;
     }
 
-    void publish_scaled_pose ( ros::Publisher &publisher ) {
-        
-        
-        publisher.publish ( filt_pose );
-    }
-
     void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
         orb_data_queue.push_back ( msg );
     }
-    void nav_data_callback ( ardrone_autonomy::Navdata msg ) {
-        nav_data_queue.push_back ( msg );
+    void nav_callback ( ardrone_autonomy::Navdata msg ) {
+        if ( isStarted ) {
+            nav_data_queue.push_back ( msg );
+
+            return;   // we already have the yaw error correction so this function is very slim after initial yaw correction
+        }
+        if ( msg.altd > 0 && not isStarted ) { //the yaw jump occurs exactly when the first altd message arrives + make sure it gets called only once
+            isStarted = true;
+
+            tf::StampedTransform yaw_correction_after_jump_tf;
+            try {
+                tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time ( 0 ), yaw_correction_after_jump_tf );
+            } catch ( tf::LookupException e ) {
+                ROS_WARN ( "Failed to lookup transformation after yaw jump! Do not trust the direction of flight!" );
+
+            }
+
+            tf::Transform yaw_correction_transform = yaw_correction_before_jump_tf * yaw_correction_after_jump_tf;
+            yaw_correction_quat = yaw_correction_transform.getRotation();
+
+            return;
+        }
+        try {
+            tf_listener.lookupTransform ( "odom", "/ardrone_base_link", ros::Time ( 0 ), yaw_correction_before_jump_tf ); //we keep updating yaw_correction_before_jump_tf as long as there is no jump
+        }                                                                                                             //to make sure we have the latest coordinate frame before the jump
+        catch ( tf::LookupException e ) {
+            cout << "failed to lookup ardrone_base_link - is the driver running?" << endl;
+        }
     }
 
 };
-
 
 int main ( int argc, char **argv ) {
     ros::init ( argc, argv, "scale_estimator" );
@@ -160,11 +177,14 @@ int main ( int argc, char **argv ) {
     // estimates scale
     ScaleEstimator scale_est;
 
+
     // subscribe to orb pose and accelerometer data from imu
     ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orb_callback, &scale_est );
+    ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 50,  &ScaleEstimator::nav_callback, &scale_est );
+
 
     // publish scale and filtered orb pose
-    ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_scaled",2 );
+    ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/ardrone/pose_scaled",2 );
     ros::Publisher orb_scale_pub = nh.advertise<std_msgs::Float32> ( "/orb/scale", 2 );
 
     int rate = 60;
@@ -187,8 +207,11 @@ int main ( int argc, char **argv ) {
                 scale_est.estimate_scale();
                 scale_est.estimate_pose();
 
+                std_msgs::Float32 scale;
+                scale.data= scale_est.scale;
+
                 orb_scale_pub.publish ( scale_est.scale );
-                scale_est.publish_scaled_pose ( filt_orb_pub );
+                filt_orb_pub.publish ( scale_est.filt_pose );
 
                 scale_est.orbAverages.clear();
                 scale_est.altAverages.clear();
@@ -198,10 +221,6 @@ int main ( int argc, char **argv ) {
         }
         ros::spinOnce();
         loop_rate.sleep();
-
-        // TODO: debug
-        std_msgs::Float32 scale = scale_est.scale;
-        geometry_msgs::PoseWithCovarianceStamped scaled_orb_pose = scale_est.get_scaled_pose();
 
     }
 
