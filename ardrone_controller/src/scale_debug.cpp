@@ -29,6 +29,7 @@ public:
     double orbNorm_;
     double navNorm_;
     double lambdaPointEstimate_;
+    double z_scale_;
     double s_xx_, s_yy_, s_xy_;
     double log_likelihood_;
     double angle_;
@@ -86,16 +87,18 @@ public:
 
         lambdaPointEstimate_ = computeEstimator ( s_xx_,s_yy_,s_xy_, orb_noise_, nav_noise_ );
 
+        z_scale_ = computeEstimator ( orb_[2]*orb_[2], nav_[2]*nav_[2], nav_[2]*orb_[2], orb_noise_, nav_noise_ );
+
         realDisplacement_ = computeRealDisplacement ( orb_, nav_, lambdaPointEstimate_, orb_noise_, nav_noise_ );
         log_likelihood_ = computeLogLikelihood ( orb_, nav_, realDisplacement_, lambdaPointEstimate_, orb_noise_, nav_noise_ );
     }
 
-    inline bool isInlier ( float angle ) {
-        return angle_ < angle && abs(nav_[2]) > 0.0001 && orb_[2] > 0.00001;
+    inline bool isInlier ( float angle , float orb_tol, float nav_tol ) {
+        return angle_ < angle && abs ( nav_[2] ) > nav_tol && orb_[2] > orb_tol;
     }
 
     inline bool operator < ( const ScaleStruct& comp ) const {
-        return lambdaPointEstimate_ < comp.lambdaPointEstimate_;
+        return z_scale_ < comp.z_scale_;
     }
 };
 //
@@ -174,28 +177,36 @@ public:
         filt_pose_.pose.pose.orientation.x = filt_pose_.pose.pose.orientation.y = filt_pose_.pose.pose.orientation.z =filt_pose_.pose.pose.orientation.w = 0;
     }
 
-    vector<double> scaleRANSAC ( vector<ScaleStruct> scale_vctr, double ratio, double angle, double orb_noise, double nav_noise , int cut_off) {
+    vector<double> scaleRANSAC ( vector<ScaleStruct> scale_vctr, double ratio, double angle, double orb_tol, double nav_tol, double orb_noise, double nav_noise , int cut_off ) {
+
+        vector<ScaleStruct> temp;
+        for ( int i=0; i<scale_vctr.size(); i++ ) {
+
+            if ( scale_vctr[i].isInlier ( angle, orb_tol, nav_tol ) ) {
+                temp.push_back ( scale_vctr[i] );
+            }
+        }
 
         sort ( scale_vctr.begin(), scale_vctr.end() );
-				int counter = 0;
-				
-        double median = ( scale_vctr.size() < 5 ) ? 1 : scale_vctr[ ( scale_vctr.size() +1 ) /2].lambdaPointEstimate_;
+        int counter = 0;
+
+        double median = ( scale_vctr.size() < 5 ) ? 1 : scale_vctr[ ( scale_vctr.size() +1 ) /2].z_scale_;
 
         // find sums and median.
         // do separately for xy and z and xyz-all and xyz-filtered
         double S_yy, S_xx, S_xy,  S_yy_xy, S_xx_xy, S_xy_xy, S_yy_z, S_xx_z, S_xy_z;
         S_yy = S_xx = S_xy = S_yy_xy = S_xx_xy = S_xy_xy = S_yy_z = S_xx_z = S_xy_z = 0;
-        						//cout << " scale samples: " << endl;
-				for ( unsigned int i=0; i<scale_vctr.size(); i++ ) {
+        //cout << " scale samples: " << endl;
+        for ( unsigned int i=0; i<temp.size(); i++ ) {
 
-            ScaleStruct s = scale_vctr[i];
+            ScaleStruct s = temp[i];
 
-            if ( (scale_vctr.size() < 5 || ( s.lambdaPointEstimate_ > median * ratio && s.lambdaPointEstimate_ < median / ratio )) ) {
-								//cout << s.lambdaPointEstimate_ << endl;
-							if ( s.isInlier ( angle ))  {
-								//	printScaleStruct("_-------------------------------------------", s);
-							  //cout << s.lambdaPointEstimate_ << endl;
-								//printScaleStruct("scale: " ,s);
+            if ( ( temp.size() < 5 || ( s.z_scale_ > median * ratio && s.z_scale_ < median / ratio ) ) ) {
+                //cout << s.lambdaPointEstimate_ << endl;
+                //cout << s.z_scale_ << "\t";
+                //	printScaleStruct("_-------------------------------------------", s);
+                //cout << s.lambdaPointEstimate_ << endl;
+                //printScaleStruct("scale: " ,s);
                 // xy - scale
                 S_yy_xy += s.nav_[0] * s.nav_[0] + s.nav_[1] * s.nav_[1];
                 S_xy_xy += s.nav_[0] * s.orb_[0] + s.orb_[1] * s.nav_[1];
@@ -205,98 +216,87 @@ public:
                 S_yy_z += s.nav_[2] * s.nav_[2];
                 S_xy_z += s.nav_[2] * s.orb_[2];
                 S_xx_z += s.orb_[2] * s.orb_[2];
-								
+
                 // total scale
                 S_yy += s.nav_.dot ( s.nav_ );
                 S_xy += s.nav_.dot ( s.orb_ );
                 S_xx += s.orb_.dot ( s.orb_ );
-								counter++;
-								}
+                counter++;
             }
         }
         //cout << "-------------------------" << endl;
-        //cout << "counter:" << counter << endl;
-        if (counter > cut_off) {
-				
-					fixed_scale_ = true;
-					//cout << "FIXED" << endl;
-				}
+        //cout << "counter:" << counter << " median: " << median << endl;
+
         //cout <<"Sxx" <<  S_xx <<" " << S_yy <<" " << S_xy << endl;
         double scale_xy = ScaleStruct::computeEstimator ( S_xx_xy, S_yy_xy, S_xy_xy, orb_noise, nav_noise );
         double scale_z = ScaleStruct::computeEstimator ( S_xx_z, S_yy_z, S_xy_z, orb_noise, nav_noise );
         double scale_tot = ScaleStruct::computeEstimator ( S_xx, S_yy, S_xy, orb_noise, nav_noise );
         vector<double> scales = {scale_xy, scale_z, scale_tot};
 
+        if ( counter > cut_off and not fixed_scale_ ) {
+
+            fixed_scale_ = true;
+            scale_ = scale_z;
+            //cout << "FIXED" << endl;
+        }
+
         return scales;
     }
 
-    void plotBatchScales ( float true_scale, float rel_scale_error, vector<float> ratios, vector<float> angles, vector<float> variances ) {
+    void plotBatchScales ( vector<float> orb_tol, vector<float> nav_tol, vector<float> ratios, vector<float> angles, vector<float> variances ) {
         //debug
         int counter = 0;
         int num_converged = 0;
-				
+
         std_msgs::Float32MultiArray data_array;
-				
+				float x = latest_pose_.pose.pose.position.x;
+
         for ( int r = 0; r < ratios.size(); r++ ) {
             for ( int a = 0; a < angles.size(); a++ ) {
                 for ( int v = 0; v < variances.size(); v++ ) {
-										float x = latest_pose_.pose.pose.position.x;
-										float y = latest_pose_.pose.pose.position.y;
-										float z = latest_pose_.pose.pose.position.z;
-										tf::Vector3 ax = tf::Vector3(x,y,z);
-										
-									
-                    vector<double> scales = scaleRANSAC ( scale_vector_, ratios[r], angles[a], nav_noise_ * variances[v], nav_noise_ , 30);
-										
-                    float t = fmod ( ros::Time::now().toSec(),1000 );
-//                     data_array.data.push_back ( scales[0] );
-//                     if ( scales[0] < true_scale * ( 1 + rel_scale_error ) && scales[0] > true_scale * ( 1 - rel_scale_error ) ) {
-//                         cout << "xy : " << " id: " << counter << " t: " << t << " r: " << ratios[r] << " a: " << angles[a] << " v: " << variances[v]<< " s: " << scales[0];
-// 												cout << " x: " << x / scales[0] << endl;
-//                         num_converged++;
-//                     }
-//                     counter++;
-                    data_array.data.push_back ( scales[1] );
-                    if ( true /*scales[1] < true_scale * ( 1 + rel_scale_error ) && scales[1] > true_scale * ( 1 - rel_scale_error )*/ ) {
-                        cout << "z  : " << " id: " << counter << " t: " << t << " r: " << ratios[r] << " a: " << angles[a] << " v: " << variances[v] << " s: " << scales[1] ;
-                        cout << " x: " << x / scales[1] << endl;
-                        num_converged++;
+                    for ( int o =0; o< orb_tol.size(); o++ ) {
+                        for ( int n=0; n< nav_tol.size(); n++ ) {
+
+                            vector<double> scales = scaleRANSAC ( scale_vector_, ratios[r], angles[a], orb_tol[o], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , 1e6 );
+
+                            float t = fmod ( ros::Time::now().toSec(),1000 );
+
+                            counter++;
+                            data_array.data.push_back ( scales[1] );
+                            cout << " s: " << scales[1] << " o: " << orb_tol[o] << "n: " << nav_tol[n] <<" t: " << t << " r: " << ratios[r] << " a: " << angles[a] << " v: " << variances[v]  ;
+                            cout << " x: " << x / scales[1] << endl;
+                        }
+
                     }
-//                     counter++;
-//                     data_array.data.push_back ( scales[2] );
-//                     if ( scales[2] < true_scale * ( 1 + rel_scale_error ) && scales[2] > true_scale * ( 1 - rel_scale_error ) ) {
-//                         cout << "tot: " << " id: " << counter << " t: " << t << " r: " << ratios[r] << " a: " << angles[a] << " v: " << variances[v] << " s: " << scales[2] ;
-//                         cout << " x: " << x / scales[2] << endl;
-//                         num_converged++;
-//                     }
-//                     counter++;
+
+
+
                 }
             }
         }
         cout << endl << "========================== num converged " << num_converged << "==========================" << endl;
-				data_array_ = data_array;
+        data_array_ = data_array;
 
     }
 
     void estimateScale() {//TODO ugly code
-        // indoor-3m-3m-orb2.bag
-        float true_scale = 0.1406;
-        float rel_scale_error = 10000;
-
-        vector<float> ratios = {0.2, 0.4,0.6, /*0.8, 0.9*/};// orb_noise / nav_noise
+        vector<float> ratios = {0.2/*, 0.4,0.6, /*0.8, 0.9*/};// orb_noise / nav_noise
         vector<float> angles = {10, 20, 30};
         vector<float> variances = {0.1, .2, 0.3, .4, 0.5, .6, 0.7, .8, 0.9, 1};
+        vector<float> orb_tol = {/*0.1, 0.01, 0.001, 0.0001,*/ 0};
+        vector<float> nav_tol = {/*0.1, 0.01, 0.001, 0.0001,*/ 0};
 
-        plotBatchScales ( true_scale, rel_scale_error, ratios, angles, variances );/*
-				if (not fixed_scale_) {
-						vector<double> scales = scaleRANSAC ( scale_vector_, 0.8, 20, nav_noise_ * 0.3, nav_noise_ , 100);
-						scale_ = scales[2];
-				}
-				
-				poseMsgStamped pose = getScaledOrbPose();
-				
-				cout << "s: " <<endl<< scale_ << endl<< "p: " <<endl<< pose.pose.pose.position.x << endl << pose.pose.pose.position.y <<endl<< pose.pose.pose.position.z << endl; 
-				cout << "=============" << endl;*/
+        plotBatchScales ( orb_tol, nav_tol, ratios, angles, variances );
+        /*
+        if (not fixed_scale_) {
+        		vector<double> scales = scaleRANSAC ( scale_vector_, 0.8, 20, nav_noise_ * 0.3, nav_noise_ , 100);
+        		scale_ = scales[2];
+        }
+
+        poseMsgStamped pose = getScaledOrbPose();
+
+        cout << "s: " <<endl<< scale_ << endl<< "p: " <<endl<< pose.pose.pose.position.x << endl << pose.pose.pose.position.y <<endl<< pose.pose.pose.position.z << endl;
+        cout << "=============" << endl;*/
     }
 
     void printAll() {
@@ -340,8 +340,8 @@ public:
 
                 //setInitialPosition ( nav_tf.getOrigin() );
 
-                double pole2Hz = 2.0*3.14*0.5;
-                double pole5Hz = 2.0*3.14*0.5;
+                double pole2Hz = 15.0*3.14*0.5;
+                double pole5Hz = 15.0*3.14*0.5;
 
                 //numerator and denominator of transfer function
                 LTI::array num ( 2 ),den ( 3 );
@@ -387,14 +387,16 @@ public:
         nav_signal_.setX ( nav_x_->getOutput ( t ) );
         nav_signal_.setZ ( nav_z_->getOutput ( t ) );
 
-				
-				printVector("nav:",nav_signal_);
+
+        //printVector("nav ",nav_signal_);
+        //printVector("orb ",orb_signal_);
         // add new point estimate
-			
+
         ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
-				scale_vector_.push_back ( s );
+        //cout << "s: " << s.z_scale_ << "s tot: " << s.lambdaPointEstimate_ << endl;
+        //cout << "nav z: " << nav_signal_.getZ() << " orb z: " << orb_signal_.getZ() << endl;
 
-
+        scale_vector_.push_back ( s );
         estimateScale();
     }
 
@@ -418,14 +420,12 @@ public:
     }
 
     void navCallback ( ardrone_autonomy::Navdata navdata ) {
-        float deg_to_rad = 3.14159 / 180;
-
         // get current frame
         if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",navdata.header.stamp,
                                              ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
             try {
                 tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", navdata.header.stamp, T_curr_ );
-                T_curr_;
+
             } catch ( tf2::ExtrapolationException e ) {
                 cout << e.what() << endl;
             }
@@ -447,6 +447,7 @@ public:
 
         // publish corrected frame
         br_.sendTransform ( tf::StampedTransform ( T_correction_, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected" ) );
+        //nav_z_->timeStep ( navdata.header.stamp,T_curr_.getOrigin().getZ() );
     }
 
     void setInitialPosition ( tf::Vector3 pos ) {
@@ -498,16 +499,16 @@ int main ( int argc, char **argv ) {
 
 
 
-				scale_est.processQueue();//doesn't do anything if queue size less than 50
-				data_pub.publish ( scale_est.getData() );
+        scale_est.processQueue();//doesn't do anything if queue size less than 50
+        data_pub.publish ( scale_est.getData() );
 
 
-				poseMsgStamped scale_pose_for_publish = scale_est.getScaledOrbPose();
-				std_msgs::Float32 scale_for_publish;
-				scale_for_publish.data = scale_est.getScale();
+        poseMsgStamped scale_pose_for_publish = scale_est.getScaledOrbPose();
+        std_msgs::Float32 scale_for_publish;
+        scale_for_publish.data = scale_est.getScale();
 
-				scale_pub.publish ( scale_for_publish );
-				scaled_orb_pub.publish ( scale_pose_for_publish );
+        scale_pub.publish ( scale_for_publish );
+        scaled_orb_pub.publish ( scale_pose_for_publish );
 
         loop_rate.sleep();
     }
