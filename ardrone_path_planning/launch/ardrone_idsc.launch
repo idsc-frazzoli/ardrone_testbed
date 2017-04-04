@@ -11,9 +11,6 @@
 <!-- launch scale estimator-->
   <node name="scale_estimator" pkg="ardrone_controller" type="scale_estimator" output="screen" />
 
-<!-- launch hector trajectory plotter -->
-  <node name="hector_trajectory_server" pkg="hector_trajectory_server" type="hector_trajectory_server" />
-
 <!-- launch rviz -->
   <node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find ardrone_orb)/../rviz/master_config.rviz" />
 
