@@ -36,6 +36,7 @@
 #include <tf2/LinearMath/Vector3.h>
 #include <tf2/convert.h>
 #include <tf2/LinearMath/Transform.h>
+#include <std_msgs/Float32.h>
 
 #include<opencv2/core/core.hpp>
 
@@ -50,19 +51,22 @@
 using namespace std;
 
 class ImageGrabber {
-    public:
+public:
     ImageGrabber ( ORB_SLAM2::System *pSLAM ) : mpSLAM ( pSLAM ), pc() {
         pc.header.frame_id = "/first_keyframe_cam";
         pose_out_.header.frame_id = "odom";
     }
     void GrabImage ( const sensor_msgs::ImageConstPtr &msg );
     geometry_msgs::TransformStamped toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id );
-    tf::Transform cvMatToTF ( cv::Mat Tcw );
+		void SetScale ( std_msgs::Float32 msg) {scale_ = msg.data;};
+		tf::Transform cvMatToTF ( cv::Mat Tcw );
 
     ORB_SLAM2::System *mpSLAM;
 
     bool initialized = false;
     bool debug_mode = false;
+
+    double scale_ = 1;
 
     sensor_msgs::PointCloud pc;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
@@ -93,18 +97,27 @@ int main ( int argc, char **argv ) {
     ImageGrabber igb ( &SLAM );
 
     ros::NodeHandle nodeHandler;
-    ros::Subscriber sub = nodeHandler.subscribe ( "/camera/image_raw", 1, &ImageGrabber::GrabImage, &igb );
-    ros::Publisher pc_pub = nodeHandler.advertise<sensor_msgs::PointCloud> ( "/orb/point_cloud", 2 );
+
+    ros::Subscriber cam_sub = nodeHandler.subscribe ( "/camera/image_raw", 1, &ImageGrabber::GrabImage, &igb );
+    ros::Subscriber scale_sub = nodeHandler.subscribe ( "/scale_estimator/scale", 1, &ImageGrabber::SetScale, &igb );
+
+    ros::Publisher pointcloud_pub = nodeHandler.advertise<sensor_msgs::PointCloud> ( "/orb/point_cloud", 2 );
     ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_unscaled", 2 );
 
     ros::Rate loop_rate ( 30 );
+    int counter = 0;
 
     while ( ros::ok() ) {
         ros::spinOnce();
         if ( igb.initialized ) {
-            pc_pub.publish ( igb.pc );
+            if ( counter % 15 == 0 ) {
+                pointcloud_pub.publish ( igb.pc ); //publish at 2 Hz
+            }
+
             pose_pub.publish ( igb.pose_out_ );
         }
+
+        counter++;
         loop_rate.sleep();
     }
 
@@ -116,7 +129,6 @@ int main ( int argc, char **argv ) {
     return 0;
 }
 
-//callback
 void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
 
     // Copy the ros image message to cv::Mat.
@@ -136,7 +148,8 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
     ros::Time t = msg->header.stamp;
 
 
-    //////////////////////////////////TRANSFORMATIONS//////////////////////////////////////////////////////////////////
+    // TODO: adapt
+		//////////////////////////////////TRANSFORMATIONS//////////////////////////////////////////////////////////////////
     //To fuse the orb SLAM pose estimate with the Kalman Filter of the robot_localization package, it is
     //necessary to publish any other sensor data and the orb SLAM data in a conforming parent frame which is typically
     //called 'odom'. See REP105 and REP103 on ros.org for further details on the concept.
@@ -254,9 +267,9 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
         }
         cv::Mat pos = point_cloud[i]->GetWorldPos();
         geometry_msgs::Point32 pp;
-        pp.x = pos.at<float> ( 0 );
-        pp.y = pos.at<float> ( 1 );
-        pp.z = pos.at<float> ( 2 );
+        pp.x = pos.at<float> ( 0 ) / scale_;
+        pp.y = pos.at<float> ( 1 ) / scale_;
+        pp.z = pos.at<float> ( 2 ) / scale_;
 
         pc.points.push_back ( pp );
     }
