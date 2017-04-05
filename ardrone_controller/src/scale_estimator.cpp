@@ -45,17 +45,17 @@ class ScaleEstimator {
     }
     double get_average_z ( vector<geometry_msgs::PoseWithCovarianceStamped> &queue ) {
         double data = 0;
-        int counter = 0;
-        for ( counter ; counter < queue.size() ; counter++ ) {
+        for ( int counter = 0 ; counter < queue.size() ; counter++ ) {
             data += queue[counter].pose.pose.position.z;
         }
-        return data / counter;
+        return data / queue.size();
     }
 
     void reset_all() {
         nav_data_queue.clear();
         orb_data_queue.clear();
     }
+    
     void process_queue() {
         orbAverages.push_back ( get_average_z ( orb_data_queue ) );
         altAverages.push_back ( get_average_z ( nav_data_queue ) );
@@ -67,7 +67,7 @@ class ScaleEstimator {
 
         if ( scale_vector.size() > 120 ) return; //enough scales for accuracy
 
-        if ( orbAverages.size() != altAverages.size() ) return;
+        if ( orbAverages.size() != altAverages.size() ) return; // TODO necessary?
 
         cout << "reestimating scale..." << endl;
 
@@ -138,6 +138,7 @@ class ScaleEstimator {
     void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
         orb_data_queue.push_back ( msg );
     }
+    
     void nav_callback ( ardrone_autonomy::Navdata msg ) {
         if ( isStarted ) {
             nav_data_queue.push_back ( msg );
@@ -187,28 +188,20 @@ int main ( int argc, char **argv ) {
     ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/ardrone/pose_scaled",2 );
     ros::Publisher orb_scale_pub = nh.advertise<std_msgs::Float32> ( "/orb/scale", 2 );
 
-    int rate = 60;
+    int rate = 20;
     ros::Rate loop_rate ( rate );
     cout << "Started scale estimation with rate " << rate << " Hz" << endl;
 
     while ( ros::ok() ) {
-
+         
+        ros::spinOnce();
+        loop_rate.sleep();
+        
         if ( scale_est.orb_data_queue.size() > 0 ) {
-
-            ros::spinOnce();
-            loop_rate.sleep();
-
-            ros::spinOnce();
-            loop_rate.sleep();
-
             scale_est.process_queue();
 
             if ( scale_est.orbAverages.size() > 5 ) {
                 scale_est.estimate_scale();
-                scale_est.estimate_pose();
-
-                std_msgs::Float32 scale;
-                scale.data= scale_est.scale;
 
                 orb_scale_pub.publish ( scale_est.scale );
                 filt_orb_pub.publish ( scale_est.filt_pose );
@@ -219,9 +212,10 @@ int main ( int argc, char **argv ) {
                 scale_est.reset_all();
             }
         }
-        ros::spinOnce();
-        loop_rate.sleep();
-
+        
+        scale_est.estimate_pose();
+        orb_scale_pub.publish(scale_est.filt_pose);
+        
     }
 
     return 0;
