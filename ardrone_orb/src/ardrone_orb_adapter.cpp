@@ -50,7 +50,7 @@
 using namespace std;
 
 class ImageGrabber {
-public:
+    public:
     ImageGrabber ( ORB_SLAM2::System *pSLAM ) : mpSLAM ( pSLAM ), pc() {
         pc.header.frame_id = "/first_keyframe_cam";
         pose_out_.header.frame_id = "odom";
@@ -189,6 +189,11 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
 
         //tf::Transform cam_to_first_keyframe_transform = cvMatToTF ( Tcw );
         tf::Transform orb_pose_unscaled_cam_to_first_keyframe_cam = cvMatToTF ( Tcw );
+        tf::Transform pose_out = odom_to_second_keyframe_base_transform
+                                 * base_link_to_camera_transform_no_translation
+                                 * second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
+                                 * orb_pose_unscaled_cam_to_first_keyframe_cam
+                                 * base_link_to_camera_transform_no_translation.inverse();
 
         if ( debug_mode ) {
             // odom to second_keyframe_base_link
@@ -208,19 +213,8 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
 
             // orb_pose_unscaled_cam to orb_pose_unscaled
             br.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation.inverse(), t, "/orb_pose_unscaled_cam", "/orb_pose_unscaled" ) );
-        } else {
-            tf::Transform output = odom_to_second_keyframe_base_transform
-                                   * base_link_to_camera_transform_no_translation
-                                   * second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
-                                   * base_link_to_camera_transform_no_translation.inverse();
-            //br.sendTransform(tf::StampedTransform(output , t, "odom", "/first_keyframe_base_link"));
-        }
-
-        tf::Transform pose_out = odom_to_second_keyframe_base_transform
-                                 * base_link_to_camera_transform_no_translation
-                                 * second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
-                                 * orb_pose_unscaled_cam_to_first_keyframe_cam
-                                 * base_link_to_camera_transform_no_translation.inverse();
+        } else
+            br.sendTransform ( tf::StampedTransform ( pose_out , t, "odom", "/orb_pose_unscaled" ) );
 
         //generate pose for robot_localization EKF sensor fusion
         //the pose is simply generated from the above derived transformations
@@ -236,19 +230,17 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
         pose_out_.pose.pose.position.y = pose_origin.getY();
         pose_out_.pose.pose.position.z = pose_origin.getZ();
 
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////77
-        //TODO: Set covariance
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //covariance
         for ( auto & x : pose_out_.pose.covariance ) {
             x = 0.0;
         }
 
-        pose_out_.pose.covariance[0] = 1;
-        pose_out_.pose.covariance[7] = 1;
-        pose_out_.pose.covariance[14] = 1;
-        pose_out_.pose.covariance[21] = 1;
-        pose_out_.pose.covariance[28] = 1;
-        pose_out_.pose.covariance[35] = 1;
+        pose_out_.pose.covariance[0] = 0.1;
+        pose_out_.pose.covariance[7] = 0.1;
+        pose_out_.pose.covariance[14] = 0.1;
+        pose_out_.pose.covariance[21] = 0.1;
+        pose_out_.pose.covariance[28] = 0.1;
+        pose_out_.pose.covariance[35] = 0.1;
     }
 
 // gets points from most recent frame
@@ -294,3 +286,4 @@ tf::Transform ImageGrabber::cvMatToTF ( cv::Mat Tcw ) {
     return cam_to_first_keyframe_transform;
 }
 
+// kate: indent-mode cstyle; indent-width 4; replace-tabs on; 

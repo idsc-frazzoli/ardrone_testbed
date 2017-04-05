@@ -1,4 +1,0 @@
-<frame>
-	<parent>"world"</parent>
-	<child>"odom"</child>
-</frame>
