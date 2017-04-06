@@ -81,7 +81,7 @@ public:
     }
 
     inline bool isInlier ( float orb_tol, float nav_tol ) {
-        return navNorm_ > nav_tol && orbNorm_ > orb_tol;
+        return abs(nav_z_) > nav_tol && abs(orb_z_) > orb_tol;
     }
 
     inline bool operator < ( const ScaleStruct& comp ) const {
@@ -172,18 +172,17 @@ public:
         int counter = 0;
 
         double median = ( scale_vctr.size() < 5 ) ? 1 : scale_vctr[ ( scale_vctr.size() +1 ) /2].lambdaPointEstimate_;
-
+        
         // find sums and median.
         // do separately for xy and z and xyz-all and xyz-filtered
         double S_yy_z, S_xx_z, S_xy_z;
         S_yy_z = S_xx_z = S_xy_z = 0;
-
+                
         for ( unsigned int i=0; i<temp.size(); i++ ) {
 
             ScaleStruct s = temp[i];
-
+                
             if ( temp.size() < 5 || ( s.lambdaPointEstimate_ > median * ratio && s.lambdaPointEstimate_ < median / ratio ) ) {
-
                 S_yy_z += s.nav_z_ * s.nav_z_;
                 S_xy_z += s.nav_z_ * s.orb_z_;
                 S_xx_z += s.orb_z_ * s.orb_z_;
@@ -203,6 +202,8 @@ public:
 
         std_msgs::Float32MultiArray data_array;
         float x = latest_pose_.pose.pose.position.x;
+        float y = latest_pose_.pose.pose.position.y;
+        float z = latest_pose_.pose.pose.position.z;
 
         for ( int r = 0; r < ratios.size(); r++ ) {
             for ( int v = 0; v < variances.size(); v++ ) {
@@ -210,13 +211,13 @@ public:
                     for ( int n=0; n< nav_tol.size(); n++ ) {
 
                         double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , 1e6 );
-
-                        float t = fmod ( ros::Time::now().toSec(),1000 );
-
-                        counter++;
+                        
                         data_array.data.push_back ( scale );
-                        cout << " s: " << scale << " o: " << orb_tol[o] << "n: " << nav_tol[n] <<" t: " << t << " r: " << ratios[r] << " v: " << variances[v]  ;
-                        cout << " x: " << x / scale << " id: " << counter << endl;
+                        cout << " s: " << scale << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " r: " << ratios[r] << " v: " << variances[v]  ;
+                        cout << " x: " << x / scale;
+                        cout << " y: " << y / scale;
+                        cout << " z: " << z / scale << " id: " << counter << endl;
+                        counter++;
                     }
                 }
             }
@@ -226,9 +227,9 @@ public:
     }
 
     void estimateScale() {//TODO ugly code
-        vector<float> ratios = {0.2/*, 0.4,0.6, /*0.8, 0.9*/};// orb_noise / nav_noise
-        vector<float> variances = {0.1, .2, 0.3, .4, 0.5, .6, 0.7, .8, 0.9, 1};
-        vector<float> orb_tol = {0.1, 0.01, 0.001, 0.0001, 0};
+        vector<float> ratios = {0.5/*, 0.4,0.6, /*0.8, 0.9*/};
+        vector<float> variances = {0.1, 0.3, 0.5, 0.7, 0.9}; // orb_noise / nav_noise
+        vector<float> orb_tol = { 0.01, 0.001, 0.0001, 0};
         vector<float> nav_tol = {0.1, 0.01, 0.001, 0.0001, 0};
 
         plotBatchScales ( orb_tol, nav_tol, ratios, variances );
@@ -273,8 +274,8 @@ public:
             if ( first_msg_ ) { //initialize filters
                 first_msg_ = false;
 
-                double pole2Hz = 100.0*3.14*0.5;
-                double pole5Hz = 100.0*3.14*0.5;
+                double pole2Hz = 2.0*3.14*0.5;
+                double pole5Hz = 2.0*3.14*0.5;
 
                 //numerator and denominator of transfer function
                 LTI::array num ( 2 ),den ( 3 );
@@ -290,10 +291,10 @@ public:
             }
             orb_z_->timeStep ( t,orb_msg.pose.pose.position.z );
 
-            if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link_corrected",orb_msg.header.stamp,
+            if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",orb_msg.header.stamp,
                                                  ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
                 try {
-                    tf_listener_.lookupTransform ( "odom", "/ardrone_base_link_corrected", orb_msg.header.stamp, nav_tf );
+                    tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
                     nav_z_->timeStep ( t,nav_tf.getOrigin().getZ() );
 
                 } catch ( tf2::ExtrapolationException err ) {
@@ -305,7 +306,8 @@ public:
 
         orb_signal_ = orb_z_->getOutput ( t );
         nav_signal_ = nav_z_->getOutput ( t );
-
+        
+        cout << orb_signal_ << " " << nav_signal_ << endl;
         ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
 
         scale_vector_.push_back ( s );
@@ -331,34 +333,7 @@ public:
         orb_data_queue_.push_front ( msg );
         latest_pose_ = msg;
     }
-
-    void navCallback ( ardrone_autonomy::Navdata navdata ) {
-        // get current frame
-        if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",navdata.header.stamp,ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
-            try {
-                tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", navdata.header.stamp, T_curr_ );
-            } catch ( tf2::ExtrapolationException e ) {
-                cout << e.what() << endl;
-            }
-        }
-
-        if ( correction_init_ ) {
-            correction_init_ = true;
-            T_init_ = T_curr_;
-        }
-
-        // calculate correction transformation
-        if ( not correction_made_ && navdata.altd ) {
-            correction_made_ = true;
-            T_correction_ = T_curr_.inverse() * T_init_;
-        }
-
-        T_init_ = T_curr_;
-
-        // publish corrected frame
-        br_.sendTransform ( tf::StampedTransform ( T_correction_, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected" ) );
-    }
-
+    
     bool hasFixedScale() {
         return fixed_scale_;
     }
@@ -382,9 +357,6 @@ int main ( int argc, char **argv ) {
 
     // subscribe to orb pose and accelerometer data from nav
     ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orbCallback, &scale_est );
-
-    // get rotation due to magnetic field
-    ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 10, &ScaleEstimator::navCallback, &scale_est );
 
     // publish filtered orb pose
     ros::Publisher scaled_orb_pub = nh.advertise<poseMsgStamped> ( "/ardrone/pose_scaled",2 );
