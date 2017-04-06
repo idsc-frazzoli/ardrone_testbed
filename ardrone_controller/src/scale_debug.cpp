@@ -270,43 +270,43 @@ public:
         double t = orb_data_queue_.back().header.stamp.toSec();
         poseMsgStamped orb_msg;
 
-        while ( orb_data_queue_.size() >0 ) {
-            //get oldest message
-            orb_msg = orb_data_queue_.back();
-            orb_data_queue_.pop_back();
-            t = orb_msg.header.stamp.toSec();
-
-            if ( first_msg_ ) { //initialize filters
-                first_msg_ = false;
-
-                double pole2Hz = 100.0*3.14*0.5;
-                double pole5Hz = 100.0*3.14*0.5;
-
-                numerator and denominator of transfer function
-                LTI::array num ( 2 ),den ( 3 );
-                num[0]=0;
-                num[1]=pole2Hz*pole5Hz;
-                den[0]=pole2Hz*pole5Hz;
-                den[1]=pole2Hz+pole5Hz;
-                den[2]=1;
-
-                orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
-                nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
-
-            }
-
-
-            if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",orb_msg.header.stamp,
-                                                 ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
-                try {
-                    tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
-                    nav_z_->timeStep ( t,nav_tf.getOrigin().getZ() );
-
-                } catch ( tf2::ExtrapolationException err ) {
-                    cout << err.what() << endl;
-                    return;
-                }
-            }
+//         while ( orb_data_queue_.size() >0 ) {
+//             //get oldest message
+//             orb_msg = orb_data_queue_.back();
+//             orb_data_queue_.pop_back();
+//             t = orb_msg.header.stamp.toSec();
+// 
+//             if ( first_msg_ ) { //initialize filters
+//                 first_msg_ = false;
+// 
+//                 double pole2Hz = 100.0*3.14*0.5;
+//                 double pole5Hz = 100.0*3.14*0.5;
+// 
+//                 numerator and denominator of transfer function
+//                 LTI::array num ( 2 ),den ( 3 );
+//                 num[0]=0;
+//                 num[1]=pole2Hz*pole5Hz;
+//                 den[0]=pole2Hz*pole5Hz;
+//                 den[1]=pole2Hz+pole5Hz;
+//                 den[2]=1;
+// 
+//                 orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
+//                 nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
+// 
+//             }
+// 
+// 
+//             if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",orb_msg.header.stamp,
+//                                                  ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
+//                 try {
+//                     tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
+//                     nav_z_->timeStep ( t,nav_tf.getOrigin().getZ() );
+// 
+//                 } catch ( tf2::ExtrapolationException err ) {
+//                     cout << err.what() << endl;
+//                     return;
+//                 }
+//             }
         }
 
         orb_signal_ = orb_z_->getOutput ( t );
