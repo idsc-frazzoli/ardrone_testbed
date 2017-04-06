@@ -142,6 +142,7 @@ class ScaleEstimator {
     tf::Vector3 init_displacement_ = tf::Vector3 ( 0,0,0 );
     tf::TransformListener tf_listener_;
     deque<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue_;
+    deque<ardrone_autonomy::Navdata> nav_data_queue_;
     geometry_msgs::PoseWithCovarianceStamped filt_pose_, latest_pose_;
     vector<ScaleStruct> scale_vector_;
 
@@ -228,13 +229,13 @@ public:
 
     void estimateScale() {//TODO ugly code
         
-        o: 0.05 n: 0.01 r: 0.5 v: 0.7 x: 1.59891 y: -0.609929 z: 0.580346 id: 49
+        //o: 0.05 n: 0.01 r: 0.5 v: 0.7 x: 1.59891 y: -0.609929 z: 0.580346 id: 49
 
         
         vector<float> ratios = {0.5/*, 0.4,0.6, 0.8, 0.9*/};
-        vector<float> variances = {0.001, 0.3, 0.5, 0.7, 0.9, 1.1, 2, 500}; // orb_noise / nav_noise
-        vector<float> orb_tol = { 0.05, 0.01, 0.005, 0};
-        vector<float> nav_tol = { 0.05, 0.01, 0.005, 0};
+        vector<float> variances = {/*0.001, 0.3, 0.5, */0.7, 0.9/*, 1.1, 2, 500*/}; // orb_noise / nav_noise
+        vector<float> orb_tol = { 0.05/*, 0.01, 0.005, 0*/};
+        vector<float> nav_tol = { /*0.05,*/ 0.01/*, 0.005, 0*/};
 
         plotBatchScales ( orb_tol, nav_tol, ratios, variances );
 
@@ -274,14 +275,14 @@ public:
             orb_msg = orb_data_queue_.back();
             orb_data_queue_.pop_back();
             t = orb_msg.header.stamp.toSec();
-/*
+
             if ( first_msg_ ) { //initialize filters
                 first_msg_ = false;
 
                 double pole2Hz = 100.0*3.14*0.5;
                 double pole5Hz = 100.0*3.14*0.5;
 
-                //numerator and denominator of transfer function
+                numerator and denominator of transfer function
                 LTI::array num ( 2 ),den ( 3 );
                 num[0]=0;
                 num[1]=pole2Hz*pole5Hz;
@@ -292,9 +293,9 @@ public:
                 orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
                 nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
 
-            }*/
+            }
 
-/*
+
             if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",orb_msg.header.stamp,
                                                  ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
                 try {
@@ -305,7 +306,7 @@ public:
                     cout << err.what() << endl;
                     return;
                 }
-            }*/
+            }
         }
 
         orb_signal_ = orb_z_->getOutput ( t );
@@ -313,7 +314,6 @@ public:
 
         cout << orb_signal_ << " " << nav_signal_ << endl;
         ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
-
         scale_vector_.push_back ( s );
         estimateScale();
     }
@@ -336,8 +336,8 @@ public:
     void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
         if (first_orb_msg_) {
             first_orb_msg_ = false;
-            double pole2Hz = 20.0*3.14*0.5;
-            double pole5Hz = 20.0*3.14*0.5;
+            double pole2Hz = 200.0*3.14*0.5;
+            double pole5Hz = 200.0*3.14*0.5;
 
             //numerator and denominator of transfer function
             LTI::array num ( 2 ),den ( 3 );
@@ -347,7 +347,7 @@ public:
             den[1]=pole2Hz+pole5Hz;
             den[2]=1;
 
-            orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, msg.header.stamp.toSec(), 0.005 ) );
+            orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, msg.header.stamp.toSec(), 0.00005 ) );
         }
         else
         {
@@ -361,8 +361,8 @@ public:
     void navCallback (ardrone_autonomy::Navdata msg) {
         if (first_nav_msg_) {
             first_nav_msg_ = false;
-            double pole2Hz = 40.0*3.14*2;
-            double pole5Hz = 40.0*3.14*2;
+            double pole2Hz = 1000.0*3.14*2;
+            double pole5Hz = 1000.0*3.14*2;
 
             //numerator and denominator of transfer function
             LTI::array num ( 2 ),den ( 3 );
@@ -378,6 +378,8 @@ public:
         {
             nav_z_->timeStep ( msg.header.stamp.toSec(), msg.altd/1000 );
         }
+        
+        nav_data_queue_.push_front( msg);
     }
     
     bool hasFixedScale() {
