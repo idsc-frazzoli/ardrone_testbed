@@ -150,7 +150,7 @@ class ScaleEstimator {
 
 public:
 
-    ScaleEstimator() :orb_signal_ ( 0 ),nav_signal_ (0),first_msg_ ( true ) {
+    ScaleEstimator() :orb_signal_ ( 0 ),nav_signal_ ( 0 ),first_msg_ ( true ) {
         T_init_.setIdentity();
         T_curr_.setIdentity();
         T_correction_.setIdentity();
@@ -182,7 +182,7 @@ public:
 
             ScaleStruct s = temp[i];
 
-            if ( temp.size() < 5 || ( s.lambdaPointEstimate_ > median * ratio && s.lambdaPointEstimate_ < median / ratio )) {
+            if ( temp.size() < 5 || ( s.lambdaPointEstimate_ > median * ratio && s.lambdaPointEstimate_ < median / ratio ) ) {
 
                 S_yy_z += s.nav_z_ * s.nav_z_;
                 S_xy_z += s.nav_z_ * s.orb_z_;
@@ -191,7 +191,7 @@ public:
                 counter++;
             }
         }
-        
+
         if ( counter > cut_off ) fixed_scale_ = true;
 
         return ScaleStruct::computeEstimator ( S_xx_z, S_yy_z, S_xy_z, orb_noise, nav_noise );
@@ -200,26 +200,26 @@ public:
     void plotBatchScales ( vector<float> orb_tol, vector<float> nav_tol, vector<float> ratios, vector<float> variances ) {
         //debug
         int counter = 0;
-				
+
         std_msgs::Float32MultiArray data_array;
-				float x = latest_pose_.pose.pose.position.x;
+        float x = latest_pose_.pose.pose.position.x;
 
         for ( int r = 0; r < ratios.size(); r++ ) {
-						for ( int v = 0; v < variances.size(); v++ ) {
-								for ( int o =0; o< orb_tol.size(); o++ ) {
-										for ( int n=0; n< nav_tol.size(); n++ ) {
+            for ( int v = 0; v < variances.size(); v++ ) {
+                for ( int o =0; o< orb_tol.size(); o++ ) {
+                    for ( int n=0; n< nav_tol.size(); n++ ) {
 
-												double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , 1e6 );
+                        double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , 1e6 );
 
-												float t = fmod ( ros::Time::now().toSec(),1000 );
+                        float t = fmod ( ros::Time::now().toSec(),1000 );
 
-												counter++;
-												data_array.data.push_back ( scale );
-												cout << " s: " << scale << " o: " << orb_tol[o] << "n: " << nav_tol[n] <<" t: " << t << " r: " << ratios[r] << " v: " << variances[v]  ;
-												cout << " x: " << x / scale << " id: " << counter << endl;
-										}
-								}
-						}
+                        counter++;
+                        data_array.data.push_back ( scale );
+                        cout << " s: " << scale << " o: " << orb_tol[o] << "n: " << nav_tol[n] <<" t: " << t << " r: " << ratios[r] << " v: " << variances[v]  ;
+                        cout << " x: " << x / scale << " id: " << counter << endl;
+                    }
+                }
+            }
         }
         cout << endl << "====================================================" << endl;
         data_array_ = data_array;
@@ -232,7 +232,7 @@ public:
         vector<float> nav_tol = {0.1, 0.01, 0.001, 0.0001, 0};
 
         plotBatchScales ( orb_tol, nav_tol, ratios, variances );
-        
+
 // 			if (hasFixedScale()) return;
 // 			else {scale_ = filterScale ( scale_vector_, ratios, angles, orb_tol, nav_tol, nav_noise_ * variance, nav_noise_ , 1e6 );
 
@@ -249,7 +249,7 @@ public:
 
         printVector ( "position unscaled", orb_pos );
         printVector ( "position", pos );
-				
+
         cout <<"s: " << scale_ << endl;
     }
 
@@ -283,7 +283,7 @@ public:
                 den[0]=pole2Hz*pole5Hz;
                 den[1]=pole2Hz+pole5Hz;
                 den[2]=1;
-								
+
                 orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.005 ) );
                 nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.005 ) );
 
@@ -318,7 +318,7 @@ public:
         filt_pose_.header.stamp = latest_pose_.header.stamp;
         filt_pose_.header.frame_id = "odom";
 
-				filt_pose_.pose.pose.orientation = latest_pose_.pose.pose.orientation;
+        filt_pose_.pose.pose.orientation = latest_pose_.pose.pose.orientation;
         filt_pose_.pose.pose.position.x = latest_pose_.pose.pose.position.x /scale_;
         filt_pose_.pose.pose.position.y = latest_pose_.pose.pose.position.y /scale_;
         filt_pose_.pose.pose.position.z = latest_pose_.pose.pose.position.z /scale_;
@@ -335,32 +335,41 @@ public:
     void navCallback ( ardrone_autonomy::Navdata navdata ) {
         // get current frame
         if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",navdata.header.stamp,ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
-						try {tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", navdata.header.stamp, T_curr_ );} 
-						catch ( tf2::ExtrapolationException e ) {cout << e.what() << endl;}
+            try {
+                tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", navdata.header.stamp, T_curr_ );
+            } catch ( tf2::ExtrapolationException e ) {
+                cout << e.what() << endl;
+            }
         }
-        
-        if (correction_init_) {
-						correction_init_ = true;
-						T_init_ = T_curr_;
-				}
-				
+
+        if ( correction_init_ ) {
+            correction_init_ = true;
+            T_init_ = T_curr_;
+        }
+
         // calculate correction transformation
         if ( not correction_made_ && navdata.altd ) {
-						correction_made_ = true;	
-						T_correction_ = T_curr_.inverse() * T_init_;
+            correction_made_ = true;
+            T_correction_ = T_curr_.inverse() * T_init_;
         }
 
         T_init_ = T_curr_;
-				
+
         // publish corrected frame
         br_.sendTransform ( tf::StampedTransform ( T_correction_, navdata.header.stamp, "/ardrone_base_link", "/ardrone_base_link_corrected" ) );
     }
 
-    bool hasFixedScale() {return fixed_scale_;}
+    bool hasFixedScale() {
+        return fixed_scale_;
+    }
 
-    float getScale() {return scale_;}
+    float getScale() {
+        return scale_;
+    }
 
-    std_msgs::Float32MultiArray getData() {return data_array_;}
+    std_msgs::Float32MultiArray getData() {
+        return data_array_;
+    }
 };
 
 
@@ -408,4 +417,4 @@ int main ( int argc, char **argv ) {
 
     return 0;
 }
-
+// kate: indent-mode cstyle; indent-width 4; replace-tabs on; 

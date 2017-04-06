@@ -37,6 +37,7 @@
 #include <tf2/convert.h>
 #include <tf2/LinearMath/Transform.h>
 #include <std_msgs/Float32.h>
+#include <ardrone_autonomy/Navdata.h>
 
 #include<opencv2/core/core.hpp>
 
@@ -52,34 +53,45 @@ using namespace std;
 
 class ImageGrabber {
 public:
-    ImageGrabber ( ORB_SLAM2::System *pSLAM ) : mpSLAM ( pSLAM ), pc() {
-        pc.header.frame_id = "/first_keyframe_cam";
+    ImageGrabber ( ORB_SLAM2::System *pSLAM ) : mpSLAM_ ( pSLAM ), pc_() {
+        pc_.header.frame_id = "/first_keyframe_cam";
         pose_out_.header.frame_id = "odom";
     }
-    void GrabImage ( const sensor_msgs::ImageConstPtr &msg );
+    void grabImage ( const sensor_msgs::ImageConstPtr &msg );
     geometry_msgs::TransformStamped toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id );
-		void SetScale ( std_msgs::Float32 msg) {scale_ = msg.data;};
-		tf::Transform cvMatToTF ( cv::Mat Tcw );
+    bool isPointCloudValid();
 
-    ORB_SLAM2::System *mpSLAM;
+    void setScale ( std_msgs::Float32 msg ) {
+        scale_ = msg.data;
+    };
+    tf::Transform cvMatToTF ( cv::Mat Tcw );
+    double getAverageDepth ();
+    void navCallback ( ardrone_autonomy::Navdata msg ) ;
 
-    bool initialized = false;
-    bool debug_mode = false;
+    ORB_SLAM2::System *mpSLAM_;
+
+    bool pose_init_ = false;
+    bool pc_init_ = false;
+    bool debug_mode_ = true;
+    bool is_started_ = false;
 
     double scale_ = 1;
-    double init_scale_ = 1;
+    double scale_init_ = 1;
 
-    sensor_msgs::PointCloud pc;
+    sensor_msgs::PointCloud pc_;
     geometry_msgs::PoseWithCovarianceStamped pose_out_;
 
-    tf::TransformListener tf_listener;
+    tf::TransformListener tf_listener_;
 
-    tf::TransformBroadcaster br;
+    tf::TransformBroadcaster br_;
 
-    tf::StampedTransform base_link_to_camera_transform;
-    tf::StampedTransform odom_to_second_keyframe_base_transform;
-    tf::Transform second_keyframe_cam_to_first_keyframe_cam_transform;
-    tf::StampedTransform base_link_to_camera_transform_no_translation;
+    tf::StampedTransform base_link_to_camera_transform_;
+    tf::StampedTransform odom_to_second_keyframe_base_transform_;
+    tf::Transform second_keyframe_cam_to_first_keyframe_cam_transform_;
+    tf::StampedTransform base_link_to_camera_transform_no_translation_;
+    tf::StampedTransform yaw_before_jump_tf_;
+    tf::Transform yaw_correction_tf_ = tf::Transform(tf::Quaternion(0,0,0,1));
+    
 };
 
 int main ( int argc, char **argv ) {
@@ -99,8 +111,9 @@ int main ( int argc, char **argv ) {
 
     ros::NodeHandle nodeHandler;
 
-    ros::Subscriber cam_sub = nodeHandler.subscribe ( "/camera/image_raw", 1, &ImageGrabber::GrabImage, &igb );
-    ros::Subscriber scale_sub = nodeHandler.subscribe ( "/scale_estimator/scale", 1, &ImageGrabber::SetScale, &igb );
+    ros::Subscriber cam_sub = nodeHandler.subscribe ( "/camera/image_raw", 1, &ImageGrabber::grabImage, &igb );
+    ros::Subscriber scale_sub = nodeHandler.subscribe ( "/scale_estimator/scale", 1, &ImageGrabber::setScale, &igb );
+    ros::Subscriber nav_sub = nodeHandler.subscribe ( "/ardrone/navdata", 10, &ImageGrabber::navCallback, &igb );
 
     ros::Publisher pointcloud_pub = nodeHandler.advertise<sensor_msgs::PointCloud> ( "/orb/point_cloud", 2 );
     ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_unscaled", 2 );
@@ -110,11 +123,11 @@ int main ( int argc, char **argv ) {
 
     while ( ros::ok() ) {
         ros::spinOnce();
-        if ( igb.initialized ) {
-            if ( counter % 15 == 0 ) {
-                pointcloud_pub.publish ( igb.pc ); //publish at 2 Hz
-            }
-
+        if ( igb.pc_init_  && counter % 15 == 0) {
+            pointcloud_pub.publish ( igb.pc_ ); //publish at 2 Hz
+        }
+        
+        if (igb.pose_init_) {
             pose_pub.publish ( igb.pose_out_ );
         }
 
@@ -130,7 +143,7 @@ int main ( int argc, char **argv ) {
     return 0;
 }
 
-void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
+void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
 
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptr;
@@ -145,12 +158,12 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
     // Proccess the given monocular frame
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
-    cv::Mat Tcw = mpSLAM->TrackMonocular ( cv_ptr->image, cv_ptr->header.stamp.toSec() );
+    cv::Mat Tcw = mpSLAM_->TrackMonocular ( cv_ptr->image, cv_ptr->header.stamp.toSec() );
     ros::Time t = msg->header.stamp;
 
 
     // TODO: adapt
-		//////////////////////////////////TRANSFORMATIONS//////////////////////////////////////////////////////////////////
+    //////////////////////////////////TRANSFORMATIONS//////////////////////////////////////////////////////////////////
     //To fuse the orb SLAM pose estimate with the Kalman Filter of the robot_localization package, it is
     //necessary to publish any other sensor data and the orb SLAM data in a conforming parent frame which is typically
     //called 'odom'. See REP105 and REP103 on ros.org for further details on the concept.
@@ -180,55 +193,67 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
     // if points can be tracked then broadcast the pose
     if ( not Tcw.empty() ) {
 
-        if ( not initialized ) { // TODO: find first keyframe from first pose by
+        if ( not pose_init_ ) { // TODO: find first keyframe from first pose by
             //Initialization - set link between 'odom' and 'first_keyframe' frames
+            pose_init_ = true;
 
             try {
-                tf_listener.lookupTransform ( "odom", "/ardrone_base_link_corrected", ros::Time ( 0 ), odom_to_second_keyframe_base_transform );
-                tf_listener.lookupTransform ( "/ardrone_base_link_corrected", "/ardrone_base_frontcam", ros::Time ( 0 ), base_link_to_camera_transform );
-                second_keyframe_cam_to_first_keyframe_cam_transform = cvMatToTF ( Tcw );
+                tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", ros::Time ( 0 ), odom_to_second_keyframe_base_transform_ );
+                tf_listener_.lookupTransform ( "/ardrone_base_link", "/ardrone_base_frontcam", ros::Time ( 0 ), base_link_to_camera_transform_ );
+                
+                odom_to_second_keyframe_base_transform_.setData(odom_to_second_keyframe_base_transform_ * yaw_correction_tf_.inverse());
+                base_link_to_camera_transform_.setData(yaw_correction_tf_ * base_link_to_camera_transform_);
+                
+                second_keyframe_cam_to_first_keyframe_cam_transform_ = cvMatToTF ( Tcw );
 
-                odom_to_second_keyframe_base_transform.setOrigin ( tf::Vector3 ( 0, 0, 0 ) );
+                odom_to_second_keyframe_base_transform_.setOrigin ( tf::Vector3 ( 0, 0, 0 ) );
 
             } catch ( tf::LookupException e ) {
                 cout << e.what() << endl;
             }
 
-            base_link_to_camera_transform_no_translation = base_link_to_camera_transform;
-            base_link_to_camera_transform_no_translation.setOrigin ( tf::Vector3 ( 0.0, 0.0, 0.0 ) );
-
-            initialized = true;
+            base_link_to_camera_transform_no_translation_ = base_link_to_camera_transform_;
+            base_link_to_camera_transform_no_translation_.setOrigin ( tf::Vector3 ( 0.0, 0.0, 0.0 ) );
         }
+        
+        if (not pc_init_ && isPointCloudValid()) {
+            scale_init_ = getAverageDepth();
+            pc_init_ = true;
+        }
+            
 
 
         //tf::Transform cam_to_first_keyframe_transform = cvMatToTF ( Tcw );
         tf::Transform orb_pose_unscaled_cam_to_first_keyframe_cam = cvMatToTF ( Tcw );
-        tf::Transform pose_out = odom_to_second_keyframe_base_transform
-                                 * base_link_to_camera_transform_no_translation
-                                 * second_keyframe_cam_to_first_keyframe_cam_transform.inverse()
-                                 * orb_pose_unscaled_cam_to_first_keyframe_cam
-                                 * base_link_to_camera_transform_no_translation.inverse();
+        tf::Vector3 rescaled_origin = orb_pose_unscaled_cam_to_first_keyframe_cam.getOrigin() / scale_init_;
+        orb_pose_unscaled_cam_to_first_keyframe_cam.setOrigin ( rescaled_origin );
 
-        if ( debug_mode ) {
+        tf::Transform pose_out = odom_to_second_keyframe_base_transform_
+                                 * base_link_to_camera_transform_no_translation_
+                                 * second_keyframe_cam_to_first_keyframe_cam_transform_.inverse()
+                                 * orb_pose_unscaled_cam_to_first_keyframe_cam
+                                 * base_link_to_camera_transform_no_translation_.inverse();
+
+        if ( debug_mode_ ) {
             // odom to second_keyframe_base_link
-            br.sendTransform ( tf::StampedTransform ( odom_to_second_keyframe_base_transform, t, "odom", "/second_keyframe_base_link" ) );
+            br_.sendTransform ( tf::StampedTransform ( odom_to_second_keyframe_base_transform_, t, "odom", "/second_keyframe_base_link" ) );
 
             // second_keyframe_base_link to second_keyframe_cam
-            br.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation, t, "/second_keyframe_base_link", "/second_keyframe_cam" ) );
+            br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_, t, "/second_keyframe_base_link", "/second_keyframe_cam" ) );
 
             // second_keyframe_cam to first_keyframe_cam
-            br.sendTransform ( tf::StampedTransform ( second_keyframe_cam_to_first_keyframe_cam_transform.inverse(), t, "/second_keyframe_cam", "/first_keyframe_cam" ) );
+            br_.sendTransform ( tf::StampedTransform ( second_keyframe_cam_to_first_keyframe_cam_transform_.inverse(), t, "/second_keyframe_cam", "/first_keyframe_cam" ) );
 
             // first_keyframe_cam to first_keyframe_base_link
-            br.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation.inverse(), t, "/first_keyframe_cam", "/first_keyframe_base_link" ) );
+            br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_.inverse(), t, "/first_keyframe_cam", "/first_keyframe_base_link" ) );
 
             // first_keyframe_cam to orb_pose_unscaled_cam
-            br.sendTransform ( tf::StampedTransform ( orb_pose_unscaled_cam_to_first_keyframe_cam, t, "/first_keyframe_cam", "/orb_pose_unscaled_cam" ) );
+            br_.sendTransform ( tf::StampedTransform ( orb_pose_unscaled_cam_to_first_keyframe_cam, t, "/first_keyframe_cam", "/orb_pose_unscaled_cam" ) );
 
             // orb_pose_unscaled_cam to orb_pose_unscaled
-            br.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation.inverse(), t, "/orb_pose_unscaled_cam", "/orb_pose_unscaled" ) );
+            br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_.inverse(), t, "/orb_pose_unscaled_cam", "/orb_pose_unscaled" ) );
         } else
-            br.sendTransform ( tf::StampedTransform ( pose_out , t, "odom", "/orb_pose_unscaled" ) );
+            br_.sendTransform ( tf::StampedTransform ( pose_out , t, "odom", "/orb_pose_unscaled" ) );
 
         //generate pose for robot_localization EKF sensor fusion
         //the pose is simply generated from the above derived transformations
@@ -257,24 +282,53 @@ void ImageGrabber::GrabImage ( const sensor_msgs::ImageConstPtr &msg ) {
         pose_out_.pose.covariance[35] = 0.1;
     }
 
-// gets points from most recent frame
-// gets all points
-    const std::vector<ORB_SLAM2::MapPoint *> &point_cloud = mpSLAM->mpMap->GetAllMapPoints();
-// TODO: make efficient (use mpSLAM->GetTrackedMapPoints() to get most recent points)
-    pc.points.clear();
+    // gets points from most recent frame
+    // gets all points
+    const std::vector<ORB_SLAM2::MapPoint *> &point_cloud = mpSLAM_->mpMap->GetAllMapPoints();
+    // TODO: make efficient (use mpSLAM->GetTrackedMapPoints() to get most recent points)
+    pc_.points.clear();
+    pc_.header.stamp = t;
+    
     for ( size_t i = 0; i < point_cloud.size(); i++ ) {
         if ( point_cloud[i]->isBad() /* or spRefMPs.count(vpMPs[i])*/ ) {
             continue;
         }
         cv::Mat pos = point_cloud[i]->GetWorldPos();
         geometry_msgs::Point32 pp;
-        pp.x = pos.at<float> ( 0 ) / scale_;
-        pp.y = pos.at<float> ( 1 ) / scale_;
-        pp.z = pos.at<float> ( 2 ) / scale_;
+        pp.x = pos.at<float> ( 0 ) / ( scale_ * scale_init_ );
+        pp.y = pos.at<float> ( 1 ) / ( scale_ * scale_init_ );
+        pp.z = pos.at<float> ( 2 ) / ( scale_ * scale_init_ );
 
-        pc.points.push_back ( pp );
+        pc_.points.push_back ( pp );
     }
 
+}
+
+bool ImageGrabber::isPointCloudValid()
+{
+    const std::vector<ORB_SLAM2::MapPoint *> &point_cloud = mpSLAM_->mpMap->GetAllMapPoints();
+    return point_cloud.size() != 0;
+}
+    
+
+double ImageGrabber::getAverageDepth () {
+    
+    double tot_z = 0;
+    int counter = 0;
+    const std::vector<ORB_SLAM2::MapPoint *> &point_cloud = mpSLAM_->mpMap->GetAllMapPoints();
+    
+    for ( size_t i = 0; i < point_cloud.size(); i++ ) {
+        if ( point_cloud[i]->isBad() ) continue;
+        
+        cv::Mat p = point_cloud[i]->GetWorldPos();
+        
+        double l = p.dot(p);
+        tot_z += sqrt(l);
+        //tot_z += point_cloud[i]->GetWorldPos().at<float> ( 2 );
+        counter++;
+    }
+
+    float out = tot_z / counter;
 }
 
 tf::Transform ImageGrabber::cvMatToTF ( cv::Mat Tcw ) {
@@ -298,6 +352,33 @@ tf::Transform ImageGrabber::cvMatToTF ( cv::Mat Tcw ) {
     cam_to_first_keyframe_transform.setBasis ( transform_matrix );
 
     return cam_to_first_keyframe_transform;
+}
+
+void ImageGrabber::navCallback ( ardrone_autonomy::Navdata msg ) {
+    if ( is_started_ ) return;   // we already have the yaw error correction so this function is very slim after initial yaw correction
+
+    if ( msg.altd > 0 && not is_started_ ) { //the yaw jump occurs exactly when the first altd message arrives + make sure it gets called only once
+        is_started_ = true;
+
+        tf::StampedTransform yaw_after_jump_tf;
+
+        try {
+            tf_listener_.lookupTransform ( "/ardrone_base_link", "odom", ros::Time ( 0 ), yaw_after_jump_tf );
+        } catch ( tf::LookupException e ) {
+            ROS_WARN ( "Failed to lookup transformation after yaw jump! Do not trust the direction of flight!" );
+        }
+
+        tf::Transform yaw_correction_transform = yaw_before_jump_tf_ * yaw_after_jump_tf;
+        yaw_correction_tf_ = yaw_correction_transform;
+
+        return;
+    }
+
+    try {
+        tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", ros::Time ( 0 ), yaw_before_jump_tf_ );   //to make sure we have the latest coordinate frame before the jump
+    } catch ( tf::LookupException e ) {
+        ROS_WARN ( "failed to lookup ardrone_base_link - is the driver running?" );
+    }
 }
 
 // kate: indent-mode cstyle; indent-width 4; replace-tabs on; 
