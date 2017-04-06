@@ -222,7 +222,6 @@ void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
         }
             
 
-
         //tf::Transform cam_to_first_keyframe_transform = cvMatToTF ( Tcw );
         tf::Transform orb_pose_unscaled_cam_to_first_keyframe_cam = cvMatToTF ( Tcw );
         tf::Vector3 rescaled_origin = orb_pose_unscaled_cam_to_first_keyframe_cam.getOrigin() / scale_init_;

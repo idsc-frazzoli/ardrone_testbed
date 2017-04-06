@@ -81,7 +81,7 @@ public:
     }
 
     inline bool isInlier ( float orb_tol, float nav_tol ) {
-        return abs(nav_z_) > nav_tol && abs(orb_z_) > orb_tol;
+        return abs ( nav_z_ ) > nav_tol && abs ( orb_z_ ) > orb_tol;
     }
 
     inline bool operator < ( const ScaleStruct& comp ) const {
@@ -119,7 +119,7 @@ void printScaleStruct ( const std::string& str, const ScaleStruct& s ) {
 class ScaleEstimator {
     std::shared_ptr<LTI::SisoSystem> nav_x_, nav_y_, nav_z_;
     std::shared_ptr<LTI::SisoSystem> orb_x_,orb_y_,orb_z_;
-    bool first_msg_;
+    bool first_orb_msg_, first_nav_msg_;
     bool fixed_scale_ = false;
     float scale_ = 1; // has units m^-1
     float scale_ubound_ = 1;
@@ -150,7 +150,7 @@ class ScaleEstimator {
 
 public:
 
-    ScaleEstimator() :orb_signal_ ( 0 ),nav_signal_ ( 0 ),first_msg_ ( true ) {
+    ScaleEstimator() :orb_signal_ ( 0 ),nav_signal_ ( 0 ),first_orb_msg_ ( true ), first_nav_msg_ ( true ) {
         T_init_.setIdentity();
         T_curr_.setIdentity();
         T_correction_.setIdentity();
@@ -172,16 +172,16 @@ public:
         int counter = 0;
 
         double median = ( scale_vctr.size() < 5 ) ? 1 : scale_vctr[ ( scale_vctr.size() +1 ) /2].lambdaPointEstimate_;
-        
+
         // find sums and median.
         // do separately for xy and z and xyz-all and xyz-filtered
         double S_yy_z, S_xx_z, S_xy_z;
         S_yy_z = S_xx_z = S_xy_z = 0;
-                
+
         for ( unsigned int i=0; i<temp.size(); i++ ) {
 
             ScaleStruct s = temp[i];
-                
+
             if ( temp.size() < 5 || ( s.lambdaPointEstimate_ > median * ratio && s.lambdaPointEstimate_ < median / ratio ) ) {
                 S_yy_z += s.nav_z_ * s.nav_z_;
                 S_xy_z += s.nav_z_ * s.orb_z_;
@@ -211,7 +211,7 @@ public:
                     for ( int n=0; n< nav_tol.size(); n++ ) {
 
                         double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , 1e6 );
-                        
+
                         data_array.data.push_back ( scale );
                         cout << " s: " << scale << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " r: " << ratios[r] << " v: " << variances[v]  ;
                         cout << " x: " << x / scale;
@@ -227,10 +227,14 @@ public:
     }
 
     void estimateScale() {//TODO ugly code
-        vector<float> ratios = {0.5/*, 0.4,0.6, /*0.8, 0.9*/};
-        vector<float> variances = {0.1, 0.3, 0.5, 0.7, 0.9}; // orb_noise / nav_noise
-        vector<float> orb_tol = { 0.01, 0.001, 0.0001, 0};
-        vector<float> nav_tol = {0.1, 0.01, 0.001, 0.0001, 0};
+        
+        o: 0.05 n: 0.01 r: 0.5 v: 0.7 x: 1.59891 y: -0.609929 z: 0.580346 id: 49
+
+        
+        vector<float> ratios = {0.5/*, 0.4,0.6, 0.8, 0.9*/};
+        vector<float> variances = {0.001, 0.3, 0.5, 0.7, 0.9, 1.1, 2, 500}; // orb_noise / nav_noise
+        vector<float> orb_tol = { 0.05, 0.01, 0.005, 0};
+        vector<float> nav_tol = { 0.05, 0.01, 0.005, 0};
 
         plotBatchScales ( orb_tol, nav_tol, ratios, variances );
 
@@ -270,12 +274,12 @@ public:
             orb_msg = orb_data_queue_.back();
             orb_data_queue_.pop_back();
             t = orb_msg.header.stamp.toSec();
-
+/*
             if ( first_msg_ ) { //initialize filters
                 first_msg_ = false;
 
-                double pole2Hz = 2.0*3.14*0.5;
-                double pole5Hz = 2.0*3.14*0.5;
+                double pole2Hz = 100.0*3.14*0.5;
+                double pole5Hz = 100.0*3.14*0.5;
 
                 //numerator and denominator of transfer function
                 LTI::array num ( 2 ),den ( 3 );
@@ -285,12 +289,12 @@ public:
                 den[1]=pole2Hz+pole5Hz;
                 den[2]=1;
 
-                orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.005 ) );
-                nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.005 ) );
+                orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
+                nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
 
-            }
-            orb_z_->timeStep ( t,orb_msg.pose.pose.position.z );
+            }*/
 
+/*
             if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",orb_msg.header.stamp,
                                                  ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
                 try {
@@ -301,12 +305,12 @@ public:
                     cout << err.what() << endl;
                     return;
                 }
-            }
+            }*/
         }
 
         orb_signal_ = orb_z_->getOutput ( t );
         nav_signal_ = nav_z_->getOutput ( t );
-        
+
         cout << orb_signal_ << " " << nav_signal_ << endl;
         ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
 
@@ -330,8 +334,50 @@ public:
     }
 
     void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
+        if (first_orb_msg_) {
+            first_orb_msg_ = false;
+            double pole2Hz = 20.0*3.14*0.5;
+            double pole5Hz = 20.0*3.14*0.5;
+
+            //numerator and denominator of transfer function
+            LTI::array num ( 2 ),den ( 3 );
+            num[0]=0;
+            num[1]=pole2Hz*pole5Hz;
+            den[0]=pole2Hz*pole5Hz;
+            den[1]=pole2Hz+pole5Hz;
+            den[2]=1;
+
+            orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, msg.header.stamp.toSec(), 0.005 ) );
+        }
+        else
+        {
+            orb_z_->timeStep ( msg.header.stamp.toSec(), msg.pose.pose.position.z );
+        }
+         
         orb_data_queue_.push_front ( msg );
         latest_pose_ = msg;
+    }
+    
+    void navCallback (ardrone_autonomy::Navdata msg) {
+        if (first_nav_msg_) {
+            first_nav_msg_ = false;
+            double pole2Hz = 40.0*3.14*2;
+            double pole5Hz = 40.0*3.14*2;
+
+            //numerator and denominator of transfer function
+            LTI::array num ( 2 ),den ( 3 );
+            num[0]=0;
+            num[1]=pole2Hz * pole5Hz;
+            den[0]=pole2Hz * pole5Hz;
+            den[1]=pole2Hz + pole5Hz;
+            den[2]=1;
+
+            nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, msg.header.stamp.toSec(), 0.00005 ) );
+        }
+        else
+        {
+            nav_z_->timeStep ( msg.header.stamp.toSec(), msg.altd/1000 );
+        }
     }
     
     bool hasFixedScale() {
@@ -357,6 +403,9 @@ int main ( int argc, char **argv ) {
 
     // subscribe to orb pose and accelerometer data from nav
     ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orbCallback, &scale_est );
+    
+        // subscribe to orb pose and accelerometer data from nav
+    ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 10, &ScaleEstimator::navCallback, &scale_est );
 
     // publish filtered orb pose
     ros::Publisher scaled_orb_pub = nh.advertise<poseMsgStamped> ( "/ardrone/pose_scaled",2 );
