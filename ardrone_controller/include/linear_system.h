@@ -83,7 +83,7 @@ public:
   array state;//Controllable canonical form realization
   double input;
   double output;
-  double time;
+  double time=0;
   double max_time_step;
 
 
