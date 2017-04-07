@@ -261,61 +261,57 @@ public:
 
     void processQueue() {
         //Only process orb data if batch size is greater than 100
-        if ( orb_data_queue_.size() <1 ) {
-            return;
+        if ( orb_data_queue_.size() <1 ) {return;}
+        
+        double pole2Hz = 10.0*3.14*2;
+        double pole5Hz = 10.0*3.14*2;
+
+        //numerator and denominator of transfer function
+        LTI::array num ( 2 ),den ( 3 );
+        num[0]=0;
+        num[1]=pole2Hz * pole5Hz;
+        den[0]=pole2Hz * pole5Hz;
+        den[1]=pole2Hz + pole5Hz;
+        den[2]=1;
+        
+      
+        while (orb_data_queue_.size() > 1) {
+            
+            // get first orb msg                        
+            geometry_msgs::PoseWithCovarianceStamped orb_msg = orb_data_queue_.back();
+            orb_data_queue_.pop_back();
+            
+            if (first_orb_msg_) {
+                first_orb_msg_ = false;
+                
+                orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, orb_msg.header.stamp.toSec(), 0.00005 ) );
+            }
+            
+            double t = orb_msg.header.stamp.toSec();
+            
+            while (nav_data_queue_.size() > 1 and nav_data_queue_.back().header.stamp.toSec() < t) {
+                
+                ardrone_autonomy::Navdata nav_msg = nav_data_queue_.back();
+                nav_data_queue_.pop_back();
+                
+                if (first_nav_msg_) {
+                    first_nav_msg_ = false;
+                    nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, nav_msg.header.stamp.toSec(), 0.00005 ) );
+                }
+                
+                nav_z_->timeStep ( nav_msg.header.stamp.toSec(), double(nav_msg.altd)/1000.0 );
+            }
+                    
+            orb_z_->timeStep ( orb_msg.header.stamp.toSec(), orb_msg.pose.pose.position.z );
+            
+            orb_signal_ = orb_z_->getOutput ( t );
+            nav_signal_ = nav_z_->getOutput ( t );
+            
+            cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
+            ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
+            scale_vector_.push_back ( s );
+            estimateScale();
         }
-
-        //Initialize nav datatype and orb message datatype to add sensor data to fution routine
-        tf::StampedTransform nav_tf;
-        double t = orb_data_queue_.back().header.stamp.toSec();
-        poseMsgStamped orb_msg;
-
-//         while ( orb_data_queue_.size() >0 ) {
-//             //get oldest message
-//             orb_msg = orb_data_queue_.back();
-//             orb_data_queue_.pop_back();
-//             t = orb_msg.header.stamp.toSec();
-// 
-//             if ( first_msg_ ) { //initialize filters
-//                 first_msg_ = false;
-// 
-//                 double pole2Hz = 100.0*3.14*0.5;
-//                 double pole5Hz = 100.0*3.14*0.5;
-// 
-//                 numerator and denominator of transfer function
-//                 LTI::array num ( 2 ),den ( 3 );
-//                 num[0]=0;
-//                 num[1]=pole2Hz*pole5Hz;
-//                 den[0]=pole2Hz*pole5Hz;
-//                 den[1]=pole2Hz+pole5Hz;
-//                 den[2]=1;
-// 
-//                 orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
-//                 nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, t, 0.00005 ) );
-// 
-//             }
-// 
-// 
-//             if ( tf_listener_.waitForTransform ( "/odom", "/ardrone_base_link",orb_msg.header.stamp,
-//                                                  ros::Duration ( 1.0 ),ros::Duration ( 0.1 ) ) ) {
-//                 try {
-//                     tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", orb_msg.header.stamp, nav_tf );
-//                     nav_z_->timeStep ( t,nav_tf.getOrigin().getZ() );
-// 
-//                 } catch ( tf2::ExtrapolationException err ) {
-//                     cout << err.what() << endl;
-//                     return;
-//                 }
-//             }
-        }
-
-        orb_signal_ = orb_z_->getOutput ( t );
-        nav_signal_ = nav_z_->getOutput ( t );
-
-        cout << orb_signal_ << " " << nav_signal_ << endl;
-        ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
-        scale_vector_.push_back ( s );
-        estimateScale();
     }
 
     //Copies oldest message in orb msg buffer into internal pose variable
@@ -334,51 +330,11 @@ public:
     }
 
     void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
-        if (first_orb_msg_) {
-            first_orb_msg_ = false;
-            double pole2Hz = 200.0*3.14*0.5;
-            double pole5Hz = 200.0*3.14*0.5;
-
-            //numerator and denominator of transfer function
-            LTI::array num ( 2 ),den ( 3 );
-            num[0]=0;
-            num[1]=pole2Hz*pole5Hz;
-            den[0]=pole2Hz*pole5Hz;
-            den[1]=pole2Hz+pole5Hz;
-            den[2]=1;
-
-            orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, msg.header.stamp.toSec(), 0.00005 ) );
-        }
-        else
-        {
-            orb_z_->timeStep ( msg.header.stamp.toSec(), msg.pose.pose.position.z );
-        }
-         
         orb_data_queue_.push_front ( msg );
         latest_pose_ = msg;
     }
     
     void navCallback (ardrone_autonomy::Navdata msg) {
-        if (first_nav_msg_) {
-            first_nav_msg_ = false;
-            double pole2Hz = 1000.0*3.14*2;
-            double pole5Hz = 1000.0*3.14*2;
-
-            //numerator and denominator of transfer function
-            LTI::array num ( 2 ),den ( 3 );
-            num[0]=0;
-            num[1]=pole2Hz * pole5Hz;
-            den[0]=pole2Hz * pole5Hz;
-            den[1]=pole2Hz + pole5Hz;
-            den[2]=1;
-
-            nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, msg.header.stamp.toSec(), 0.00005 ) );
-        }
-        else
-        {
-            nav_z_->timeStep ( msg.header.stamp.toSec(), msg.altd/1000 );
-        }
-        
         nav_data_queue_.push_front( msg);
     }
     
@@ -407,7 +363,7 @@ int main ( int argc, char **argv ) {
     ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orbCallback, &scale_est );
     
         // subscribe to orb pose and accelerometer data from nav
-    ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 10, &ScaleEstimator::navCallback, &scale_est );
+    ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 30, &ScaleEstimator::navCallback, &scale_est );
 
     // publish filtered orb pose
     ros::Publisher scaled_orb_pub = nh.advertise<poseMsgStamped> ( "/ardrone/pose_scaled",2 );
