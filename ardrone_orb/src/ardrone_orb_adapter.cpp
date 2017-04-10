@@ -74,6 +74,7 @@ public:
     bool pc_init_ = false;
     bool debug_mode_ = true;
     bool is_started_ = false;
+    int tracking_state_=0;
 
     double scale_ = 1;
     double scale_init_ = 1;
@@ -126,8 +127,8 @@ int main ( int argc, char **argv ) {
         if ( igb.pc_init_  && counter % 15 == 0) {
             pointcloud_pub.publish ( igb.pc_ ); //publish at 2 Hz
         }
-        
-        if (igb.pose_init_) {
+
+        if (igb.pose_init_ && igb.tracking_state_ == 2) {
             pose_pub.publish ( igb.pose_out_ );
         }
 
@@ -159,6 +160,8 @@ void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
     cv::Mat Tcw = mpSLAM_->TrackMonocular ( cv_ptr->image, cv_ptr->header.stamp.toSec() );
+    tracking_state_ = mpSLAM_->GetTrackingState();
+    
     ros::Time t = msg->header.stamp;
 
 
