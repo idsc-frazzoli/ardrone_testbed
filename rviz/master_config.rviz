@@ -4,18 +4,10 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Global Options1
-        - /Status1
-        - /TF1
-        - /TF1/Frames1
         - /TF1/Tree1
-        - /PointCloud1
         - /PointCloud1/Autocompute Value Bounds1
-        - /PoseWithCovariance1
-        - /Marker1
-        - /Marker1/Namespaces1
-      Splitter Ratio: 0.636029422
-    Tree Height: 577
+      Splitter Ratio: 0.816666663
+    Tree Height: 559
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -66,21 +58,11 @@ Visualization Manager:
         ardrone_base_frontcam:
           Value: false
         ardrone_base_link:
-          Value: false
-        first_keyframe_base_link:
-          Value: false
-        first_keyframe_cam:
-          Value: false
-        odom:
-          Value: false
-        orb_pose_unscaled:
-          Value: false
-        orb_pose_unscaled_cam:
           Value: true
-        second_keyframe_base_link:
-          Value: false
-        second_keyframe_cam:
-          Value: false
+        odom:
+          Value: true
+        orb_pose_unscaled:
+          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -93,14 +75,8 @@ Visualization Manager:
               {}
             ardrone_base_frontcam:
               {}
-          second_keyframe_base_link:
-            second_keyframe_cam:
-              first_keyframe_cam:
-                first_keyframe_base_link:
-                  {}
-                orb_pose_unscaled_cam:
-                  orb_pose_unscaled:
-                    {}
+          orb_pose_unscaled:
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -115,13 +91,6 @@ Visualization Manager:
       Transport Hint: raw
       Unreliable: false
       Value: true
-    - Class: rviz/Axes
-      Enabled: false
-      Length: 0.300000012
-      Name: LE DRONÉ
-      Radius: 0.0500000007
-      Reference Frame: odom
-      Value: false
     - Class: rviz/Axes
       Enabled: false
       Length: 1
@@ -148,7 +117,7 @@ Visualization Manager:
       Radius: 0.0299999993
       Shaft Diameter: 0.100000001
       Shaft Length: 0.100000001
-      Topic: /trajectory
+      Topic: /ardrone/path
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -163,7 +132,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: AxisColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -180,12 +149,12 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
-      Axes Length: 0.5
-      Axes Radius: 0.0500000007
+      Axes Length: 0.100000001
+      Axes Radius: 0.0199999996
       Class: rviz_plugin_covariance/PoseWithCovariance
-      Color: 234; 0; 255
+      Color: 255; 25; 0
       Covariance:
         Orientation:
           Alpha: 0.5
@@ -200,28 +169,20 @@ Visualization Manager:
           Color: 204; 51; 204
           Scale: 1
           Value: true
-        Value: false
-      Enabled: false
+        Value: true
+      Enabled: true
       Head Length: 0.300000012
       Head Radius: 0.100000001
       Name: PoseWithCovariance
       Shaft Length: 1
       Shaft Radius: 0.0500000007
       Shape: Axes
-      Topic: /orb/pose_scaled
+      Topic: /ardrone/pose_scaled
       Unreliable: false
-      Value: false
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /reference_trajectory
-      Name: Marker
-      Namespaces:
-        {}
-      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
-    Background Color: 48; 48; 48
+    Background Color: 0; 0; 0
     Fixed Frame: odom
     Frame Rate: 30
   Name: root
@@ -242,25 +203,25 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz/ThirdPersonFollower
-      Distance: 2.46282387
+      Class: rviz/Orbit
+      Distance: 8.07630634
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.0935003757
-        Y: 0.742239118
-        Z: 1.06597827e-06
-      Focal Shape Fixed Size: true
+        X: 0.0748433247
+        Y: -1.69500029
+        Z: 0.327115059
+      Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.065398246
+      Pitch: 0.554797769
       Target Frame: odom
-      Value: ThirdPersonFollower (rviz)
-      Yaw: 2.10040498
+      Value: Orbit (rviz)
+      Yaw: 3.2453928
     Saved: ~
 Window Geometry:
   Displays:
@@ -270,7 +231,7 @@ Window Geometry:
   Height: 1056
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000022200000388fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003a000002c9000000c600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001800460052004f004e0054002000430041004d0045005200410100000309000000b90000001600ffffff000000010000010f00000388fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003a000003880000009e00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d00650100000000000007800000024400fffffffb0000000800540069006d00650100000000000004500000000000000000000004430000038800000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000016a0000037afc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000002be000000dd00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001800460052004f004e0054002000430041004d00450052004101000002ec000000b60000001600ffffff000000010000010f0000037afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a0056006900650077007301000000280000037a000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007390000003efc0100000002fb0000000800540069006d00650100000000000007390000030000fffffffb0000000800540069006d00650100000000000004500000000000000000000004b40000037a00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -279,6 +240,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 1920
-  X: 0
-  Y: 24
+  Width: 1849
+  X: 71
+  Y: 38

@@ -83,7 +83,7 @@ public:
   array state;//Controllable canonical form realization
   double input;
   double output;
-  double time;
+  double time=0;
   double max_time_step;
 
 
@@ -110,7 +110,8 @@ public:
   
   //This updates the system when a new input is recieved
   void timeStep(const double& t_now, const double& u_now){
-    if(t_now < time){printf("WARNING: time request is in the past \n");}
+		
+		if(t_now < time){printf("WARNING: time request is in the past \n");}
     if(t_now==time){return;}
     
     //stuff for numerical integration
