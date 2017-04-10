@@ -1,4 +1,5 @@
 #include <queue>
+#include <fstream>
 
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
@@ -149,6 +150,16 @@ class ScaleEstimator {
     std_msgs::Float32MultiArray data_array_;
 
 
+    // recursive least squares
+
+    double Theta_lower_bound_inverse_ = 15;
+    double Theta_upper_bound_ = .2;
+    double P_lower_bound_ = 1;
+    double P_upper_bound_ = 1;
+    
+    vector<double> x_stream_, y_stream_, time_x_, time_y_;
+
+
 public:
 
     ScaleEstimator() :orb_signal_ ( 0 ),nav_signal_ ( 0 ),first_orb_msg_ ( true ), first_nav_msg_ ( true ) {
@@ -224,16 +235,16 @@ public:
             }
         }
         cout << endl << "====================================================" << endl;
-        data_array_ = data_array;
+        //data_array_ = data_array;
     }
 
     void estimateScale() {//TODO ugly code
-        
+
         //o: 0.05 n: 0.01 r: 0.5 v: 0.7 x: 1.59891 y: -0.609929 z: 0.580346 id: 49
 
-        
-        vector<float> ratios = {0.5/*, 0.4,0.6, 0.8, 0.9*/};
-        vector<float> variances = {/*0.001, 0.3, 0.5, */0.7, 0.9/*, 1.1, 2, 500*/}; // orb_noise / nav_noise
+
+        vector<float> ratios = {0.5, 0.00001/*, 0.4,0.6, 0.8, 0.9*/};
+        vector<float> variances = {0.00001/*, 0.3, 0.5, */,0.7, 0.9/*, 1.1, 2,*/, 500}; // orb_noise / nav_noise
         vector<float> orb_tol = { 0.05/*, 0.01, 0.005, 0*/};
         vector<float> nav_tol = { /*0.05,*/ 0.01/*, 0.005, 0*/};
 
@@ -261,10 +272,12 @@ public:
 
     void processQueue() {
         //Only process orb data if batch size is greater than 100
-        if ( orb_data_queue_.size() <1 ) {return;}
-        
-        double pole2Hz = 10.0*3.14*2;
-        double pole5Hz = 10.0*3.14*2;
+        if ( orb_data_queue_.size() <1 ) {
+            return;
+        }
+
+        double pole2Hz = 0.05*3.14*2;
+        double pole5Hz = 0.05*3.14*2;
 
         //numerator and denominator of transfer function
         LTI::array num ( 2 ),den ( 3 );
@@ -273,45 +286,76 @@ public:
         den[0]=pole2Hz * pole5Hz;
         den[1]=pole2Hz + pole5Hz;
         den[2]=1;
+
         
-      
-        while (orb_data_queue_.size() > 1) {
-            
-            // get first orb msg                        
+
+        while ( not orb_data_queue_.empty() ) {
+
+            // get first orb msg
             geometry_msgs::PoseWithCovarianceStamped orb_msg = orb_data_queue_.back();
             orb_data_queue_.pop_back();
-            
-            if (first_orb_msg_) {
+
+            if ( first_orb_msg_ ) {
+                cout << "resetting orb" << endl;
                 first_orb_msg_ = false;
-                
+
                 orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, orb_msg.header.stamp.toSec(), 0.00005 ) );
             }
-            
+
             double t = orb_msg.header.stamp.toSec();
-            
-            while (nav_data_queue_.size() > 1 and nav_data_queue_.back().header.stamp.toSec() < t) {
-                
+            time_x_.push_back(t);
+            x_stream_.push_back(orb_msg.pose.pose.position.z);
+
+            while ( not nav_data_queue_.empty() )  {
+
+                if ( nav_data_queue_.back().header.stamp.toSec() > t ) break;
+
                 ardrone_autonomy::Navdata nav_msg = nav_data_queue_.back();
                 nav_data_queue_.pop_back();
-                
-                if (first_nav_msg_) {
+
+                if ( first_nav_msg_ ) {
+                    cout << "resetting nav" << endl;
                     first_nav_msg_ = false;
                     nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, nav_msg.header.stamp.toSec(), 0.00005 ) );
                 }
                 
-                nav_z_->timeStep ( nav_msg.header.stamp.toSec(), double(nav_msg.altd)/1000.0 );
+                time_y_.push_back(nav_msg.header.stamp.toSec());
+                y_stream_.push_back(nav_msg.altd/1000);
+
+
+                nav_z_->timeStep ( nav_msg.header.stamp.toSec(), double ( nav_msg.altd ) /1000.0 );
             }
-                    
-            orb_z_->timeStep ( orb_msg.header.stamp.toSec(), orb_msg.pose.pose.position.z );
-            
+
+            orb_z_->timeStep ( t, orb_msg.pose.pose.position.z );
+
             orb_signal_ = orb_z_->getOutput ( t );
             nav_signal_ = nav_z_->getOutput ( t );
             
+            
+            
+            
             cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
+
             ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
             scale_vector_.push_back ( s );
+
             estimateScale();
+
+            updateLSScale ( orb_signal_, nav_signal_, Theta_upper_bound_, P_upper_bound_ );
+            
+            data_array_.data.clear();
+            data_array_.data.push_back ( orb_signal_ / Theta_upper_bound_ );
+            data_array_.data.push_back ( nav_signal_ );
         }
+    }
+
+
+    void updateLSScale ( const double& y,const double& phi, double& theta, double& P ) {
+        double K = P * phi / ( 1 + phi * P * phi );
+
+        theta += K * ( y - phi * theta );
+
+        P -= P * phi * K;
     }
 
     //Copies oldest message in orb msg buffer into internal pose variable
@@ -333,11 +377,11 @@ public:
         orb_data_queue_.push_front ( msg );
         latest_pose_ = msg;
     }
-    
-    void navCallback (ardrone_autonomy::Navdata msg) {
-        nav_data_queue_.push_front( msg);
+
+    void navCallback ( ardrone_autonomy::Navdata msg ) {
+        nav_data_queue_.push_front ( msg );
     }
-    
+
     bool hasFixedScale() {
         return fixed_scale_;
     }
@@ -349,6 +393,23 @@ public:
     std_msgs::Float32MultiArray getData() {
         return data_array_;
     }
+
+    void errorToFile ( const std::string& name_x, const std::string& name_y,  const std::string& path) {
+        ofstream x;
+        x.open ( path+name_x );
+        for ( int i=0; i<time_x_.size(); i++ ) {
+            x << x_stream_[i] << "," << time_x_[i] << std::endl;
+        }
+        x.close();
+        
+        ofstream y;
+        y.open ( path+name_y );
+        for ( int i=0; i<time_y_.size(); i++ ) {
+            y << y_stream_[i] << "," << time_y_[i] << std::endl;
+        }
+        y.close(); 
+    }
+
 };
 
 
@@ -361,8 +422,8 @@ int main ( int argc, char **argv ) {
 
     // subscribe to orb pose and accelerometer data from nav
     ros::Subscriber orb_sub = nh.subscribe ( "/orb/pose_unscaled", 10, &ScaleEstimator::orbCallback, &scale_est );
-    
-        // subscribe to orb pose and accelerometer data from nav
+
+    // subscribe to orb pose and accelerometer data from nav
     ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 30, &ScaleEstimator::navCallback, &scale_est );
 
     // publish filtered orb pose
@@ -382,6 +443,7 @@ int main ( int argc, char **argv ) {
         ros::spinOnce();
 
         scale_est.processQueue();//doesn't do anything if queue size less than 50
+
         data_pub.publish ( scale_est.getData() );
 
         poseMsgStamped scale_pose_for_publish = scale_est.getScaledOrbPose();
@@ -394,6 +456,9 @@ int main ( int argc, char **argv ) {
         loop_rate.sleep();
     }
 
+    scale_est.errorToFile("x_stream_bag_2", "y_stream_bag_2", "~/" );
+    
     return 0;
 }
 // kate: indent-mode cstyle; indent-width 4; replace-tabs on; 
+
