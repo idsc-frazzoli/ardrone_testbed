@@ -1,9 +1,0 @@
-/**
-\mainpage
-\htmlinclude manifest.html
-
-This package provides C++ APIs for manipulating geodetic coordinates.
-
-It has no nodes, utilities, or scripts.
-
-*/
