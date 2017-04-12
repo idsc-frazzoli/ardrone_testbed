@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>ardrone_path_planning</name>
+  <name>ardrone_planner_utils</name>
   <version>0.0.0</version>
   <description>AR-Drone motion planning package</description>
 

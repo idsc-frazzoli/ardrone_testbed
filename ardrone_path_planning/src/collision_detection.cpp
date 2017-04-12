@@ -1,10 +1,108 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud.h>
 #include <kdtree.h>
-#include <glc_interface.h>
+// #include <glc_interface.h>
 #include <time.h>
 
-class PointCloudEnvironment : public glc::Obstacles
+typedef std::valarray<double> vctr;
+
+class Trajectory{
+  std::vector<vctr> states;
+  std::vector<double> time;
+public:
+  
+  void clear(){
+    states.clear();
+    time.clear();
+  }
+  
+  void resize(int n){
+    states.resize(n);
+    time.resize(n);
+  }
+  
+  void reserve(int n){
+    states.reserve(n);
+    time.reserve(n);
+  }
+  
+  void push(const Trajectory& tail){
+    //states.reserve(states.size()+tail.states.size());
+    states.insert(states.end(), tail.states.begin(), tail.states.end() );
+    //time.reserve(time.size()+tail.time.size());
+    time.insert(time.end(), tail.time.begin(), tail.time.end() );
+  }
+  
+  void pop_back(){
+    states.pop_back();
+    time.pop_back();
+    //return;
+  }
+  
+  //get last element
+  void back(vctr& x, double& t) {
+    x=states.back();
+    t=time.back();
+  }
+  
+  int size() const{
+    return time.size();
+  }
+  
+  void get(int index, vctr& x, double& t) const{
+    x=states[index];
+    t=time[index];
+  }
+  const vctr& getState(int index) const{
+    return states[index];
+  }
+  
+  void set(int index, const vctr& x, double t) {
+    states[index]=x;
+    time[index]=t;
+  }
+  
+  void push_back(const vctr& x, const double t){
+    states.push_back(x);
+    time.push_back(t);
+  }
+  const double& getTime(int index) const{
+    return time[index];
+  }
+  
+  double getDuration() const {
+    return time.back() - time.front();
+  }
+  
+  double getEndTime() const {
+    return time.back();
+  }
+  
+  double getDurationFrom(int index) const {
+    return time.back() - time.at(index);
+  }
+};
+
+
+class Obstacles{
+public:
+  int collision_counter=0;
+  //check pointwise for collision    
+  virtual bool collisionFree(const Trajectory& x, int* last=NULL){ 
+    for(int i=0;i<x.size();i++) {
+      if(not collisionFree(x.getState(i), x.getTime(i))){
+        if(last)
+          *last = i;
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  virtual bool collisionFree(const vctr& x, const double& t)=0;
+};
+
+class PointCloudEnvironment : public Obstacles
 {
     kdtree::Kdtree* kdtree;
     const int dimension = 3;
@@ -12,8 +110,7 @@ class PointCloudEnvironment : public glc::Obstacles
     
 public:
     //The pointcloud is 3D 
-    void updatePointCloud(const sensor_msgs::PointCloud& new_point_cloud)//TODO seg faults if point cloud is empty
-    {
+    void updatePointCloud(const sensor_msgs::PointCloud& new_point_cloud){
         std::cout << "Received new point cloud of size " << new_point_cloud.points.size() << " from ORB-SLAM" << std::endl;
         //rebuild kdtree for each new point cloud
         if(kdtree!=nullptr)
@@ -36,16 +133,13 @@ public:
         
         std::cout << " Built kdtree in " << ((float)(clock()-t))/CLOCKS_PER_SEC << " seconds " << std::endl;
     }
-    bool collisionFree(const glc::vctr& state, const double& t)//TODO state will not have the same dimension as kdtree points
+    bool collisionFree(const vctr& state, const double& t)//TODO state will not have the same dimension as kdtree points
     {
         kdtree::point query_state = state;//TODO this is really inefficient
         query_state.resize(kdtree->dimension());//TODO ... this too
         //Don't query an empty tree
-        if(kdtree!=nullptr)
-        {
-            if(not kdtree->isEmpty())
-            {
-              
+        if(kdtree!=nullptr){
+          if(not kdtree->isEmpty()){
                 kdtree::query_results<kdtree::vertexPtr, kdtree::numT> nearest = kdtree->query(query_state,1);
                 if(kdtree::norm2(nearest.BPQ.queue.top().vtx_ptr->coord - query_state)<radius)
                     return false;
@@ -54,11 +148,10 @@ public:
         return true;
     }
     
-    bool collisionFree(const glc::Trajectory& x, int* last=NULL)
-    { 
+    bool collisionFree(const Trajectory& x, int* last=NULL){ 
+      if(kdtree==nullptr){return true;}
         for(int i=0;i<x.size();i++) {
-            if(not collisionFree(x.getState(i), x.getTime(i)))
-            {
+            if(not collisionFree(x.getState(i), x.getTime(i))){
                 if(last)
                     *last = i;
                 return false;
@@ -72,17 +165,21 @@ public:
 int main(int argc, char **argv)
 {
     PointCloudEnvironment obstacles;
+
     ros::init(argc, argv, "collision_detection");
     ros::start();
-    
+
     ros::NodeHandle node_handle;
-    ros::Subscriber point_cloud_sub = node_handle.subscribe("environment/point_cloud", 2, &PointCloudEnvironment::updatePointCloud, &obstacles);
-    
+    ros::Subscriber point_cloud_sub = node_handle.subscribe("orb/point_cloud", 2, &PointCloudEnvironment::updatePointCloud, &obstacles);
+
     ros::Rate loop_rate(1.0);
-    while(ros::ok())
-    {
-        glc::Trajectory traj;
-        glc::vctr x1(3);
+    while(ros::ok()){
+      
+        ros::spinOnce();
+      
+        //Time 100,000 collision checking queries
+        Trajectory traj;
+        vctr x1(3);
         for(int i=1;i<100000;i++){
             x1[0]=fmod(x1[0]+1,8);
             x1[1]=fmod(x1[1]+1,2.73569);
@@ -90,11 +187,11 @@ int main(int argc, char **argv)
             traj.push_back(x1,0.0);
         }
 
-        
         clock_t t=clock();
+        
         std::cout << "Collision Free? " << obstacles.collisionFree(traj) << std::endl;
-        std::cout << "Checked for collision in " << ((float)(clock()-t))/CLOCKS_PER_SEC << std::endl;
-        ros::spinOnce();
+        std::cout << "Checked 100,000 points for collision in " << ((float)(clock()-t))/CLOCKS_PER_SEC << std::endl;
+
         loop_rate.sleep();
     }
     return 0;
