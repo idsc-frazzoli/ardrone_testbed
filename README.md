@@ -28,23 +28,13 @@ This package is the adaptor for the ORB_SLAM2 library into the ROS catkin framew
 This package contains a collision detection function that organizes the ORB-SLAM point cloud into a kd-tree for efficient distance querries between the ardrone and obstacles detected by ORB-SLAM
 
 ## Dependancies
-Robot Operating System (ROS):
+Robot Operating System (ROS): [ROS](http://wiki.ros.org/ROS/Installation)
 
-[ROS](http://wiki.ros.org/ROS/Installation)
+Open Computer Vision (OpenCV): [OpenCV](http://opencv.org)
 
-Open Computer Vision (OpenCV):
+Eigen3: [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)
 
-[OpenCV](http://opencv.org)
-
-Eigen3:
-
-[Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)
-
-Pangolin:
-
-[Pangolin](https://github.com/stevenlovegrove/Pangolin)
-
-
+Pangolin: [Pangolin](https://github.com/stevenlovegrove/Pangolin)
 
 ## Getting Started
 
@@ -80,29 +70,14 @@ cd /ardrone_ws/src/
 catkin_init_workspace
 cd /ardrone_ws/
 catkin_make
+source devel/setup.bash
 ```
 
 5) Connect to the AR-DRone:
 
 Plug in the AR-Drone and connect to it via Wifi from the computer you plan to run the project from.
 
-```
-build_ros.sh
-```
-
-6) create a catkin_workspace
-
-```
-cd ardrone_ws/src/
-catkin_init_workspace
-``` 
-
-7) Run catkin_make to compile everything in the project
-
-```
-cd ardrone_ws/
-catkin_make
-```
+6) Launch everything:
 
 
 
