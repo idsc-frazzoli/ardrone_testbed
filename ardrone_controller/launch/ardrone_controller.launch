@@ -1,3 +1,0 @@
-<launch>
-  <node name="controller_node" pkg="ardrone_controller" type="controller_node"/>
-</launch>
