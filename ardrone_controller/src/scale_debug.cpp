@@ -364,7 +364,7 @@ public:
             
             
             
-            cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
+//             cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
 
             ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
             scale_vector_.push_back ( s );
@@ -505,7 +505,7 @@ int main ( int argc, char **argv ) {
         loop_rate.sleep();
     }
 
-    scale_est.errorToFile("x_stream_bag_2", "y_stream_bag_2", "./" );
+//     scale_est.errorToFile("x_stream_bag_2", "y_stream_bag_2", "./" );
     scale_est.scoresToFile("./");
     
     return 0;
