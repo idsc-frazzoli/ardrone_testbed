@@ -82,7 +82,7 @@ public:
     }
 
     inline bool isInlier ( float orb_tol, float orb_max_tol, float nav_tol ) {
-        return abs ( nav_z_ ) > nav_tol && abs ( orb_z_ ) > orb_tol && abs ( orb_z_ ) < orb_max_tol;
+        return abs ( nav_z_ ) > nav_tol && abs ( orb_z_ ) > orb_tol && abs ( orb_z_ ) < orb_max_tol && abs ( nav_z_ ) < .5;
     }
 
     inline bool operator < ( const ScaleStruct& comp ) const {
@@ -165,8 +165,10 @@ class ScaleEstimator {
     
     vector<double> x_stream_, y_stream_, time_x_, time_y_;
     int scores[2500];
-    string scores_path_="scores_01_1";
-    float true_scale_ = 0.1089;
+    string scores_path_="scores_10_3";
+    float true_scale_ = 0.0283;
+    
+    int max_counter_ = 300;
     
 
 
@@ -231,7 +233,7 @@ public:
                     for ( int o =0; o< orb_tol.size(); o++ ) {
                         for ( int n=0; n< nav_tol.size(); n++ ) {
 
-                            double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], orb_max_tol[om], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , 1e6 );    
+                            double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], orb_max_tol[om], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , max_counter_ );    
                             
                             data_array_.data.push_back(scale);
 
@@ -257,9 +259,9 @@ public:
                 }
             }
         }
-        for (int i=0; i<2500; i++) {
-            //cout << i << " : " <<scores[i] << " ";
-        }
+//         for (int i=0; i<2500; i++) {
+//             //cout << i << " : " <<scores[i] << " ";
+//         }
         cout << endl << "====================================================" << endl;
         //data_array_ = data_array;
     }
@@ -269,15 +271,15 @@ public:
         //o: 0.05 n: 0.01 r: 0.5 v: 0.7 x: 1.59891 y: -0.609929 z: 0.580346 id: 49
 
 
-        vector<float> ratios = {0.0001, 0.1, 0.2, 0.4,0.6, 0.9};
-        vector<float> variances = {0.1, 0.2, 0.3,0.4, 0.5, 1, 2, 5, 10}; // orb_noise / nav_noise
-        vector<float> orb_tol = { 0, 0.005, 0.01};
-        vector<float> nav_tol = { 0, 0.005, 0.01};
-        vector<float> orb_max_tol = { .5, .4, .3, .2,.1};
+        vector<float> ratios = {/*0.0001, */0.1/*, 0.2, 0.4,0.6, 0.9*/};
+        vector<float> variances = {/*0.1, 0.2, 0.3,0.4, 0.5, 1,*/ 2/*, 5, 10*/}; // orb_noise / nav_noise
+        vector<float> orb_tol = { 0/*, 0.005, 0.01*/};
+        vector<float> nav_tol = { /*0, */0.005/*, 0.01*/};
+        vector<float> orb_max_tol = {/* .5, .4, .3, .2,*/.1};
         
-        plotBatchScales ( orb_tol, orb_max_tol, nav_tol, ratios, variances,  true_scale_);
-// 			if (hasFixedScale()) return;
-// 			else {scale_ = filterScale ( scale_vector_, ratios, angles, orb_tol, nav_tol, nav_noise_ * variance, nav_noise_ , 1e6 );
+        //plotBatchScales ( orb_tol, orb_max_tol, nav_tol, ratios, variances,  true_scale_);
+			if (hasFixedScale()) return;
+			else {scale_ = filterScale ( scale_vector_, ratios[0], orb_tol[0], orb_max_tol[0], nav_tol[0], nav_noise_ * variances[0], nav_noise_ , max_counter_ );}
 
     }
 
@@ -286,7 +288,7 @@ public:
         float cur_orb_z = latest_pose_.pose.pose.position.x;
         float cur_orb_y = latest_pose_.pose.pose.position.y;
         float cur_orb_x = latest_pose_.pose.pose.position.z;
-
+     
         tf::Vector3 orb_pos = tf::Vector3 ( latest_pose_.pose.pose.position.x, latest_pose_.pose.pose.position.y, latest_pose_.pose.pose.position.z );
         tf::Vector3 pos = orb_pos * 1 / scale_;
 
@@ -380,7 +382,7 @@ public:
                 data_array_.data[i] = orb_signal_ / data_array_.data[i];
             }
             data_array_.data.push_back(orb_signal_ / Theta_upper_bound_);
-            cout << "LS: " << Theta_upper_bound_ << endl;
+            //cout << "LS: " << Theta_upper_bound_ << endl;
             
             
         }
@@ -411,14 +413,14 @@ public:
     }
 
     void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
-            cout << "ORB SEQ: " << msg.header.seq << endl;
+//             cout << "ORB SEQ: " << msg.header.seq << endl;
         orb_data_queue_.push_front ( msg );
         latest_pose_ = msg;
     }
 
     void navCallback ( ardrone_autonomy::Navdata msg ) {
 
-            cout << "NAV SEQ: " << msg.header.seq << endl;
+//             cout << "NAV SEQ: " << msg.header.seq << endl;
         nav_data_queue_.push_front ( msg );
     }
 
@@ -505,8 +507,8 @@ int main ( int argc, char **argv ) {
         loop_rate.sleep();
     }
 
-    scale_est.errorToFile("x_stream_bag_2", "y_stream_bag_2", "./" );
-    scale_est.scoresToFile("./");
+    //scale_est.errorToFile("x_stream_bag_2", "y_stream_bag_2", "./../../../data/" );
+//     scale_est.scoresToFile("./../../../data/");
     
     return 0;
 }
