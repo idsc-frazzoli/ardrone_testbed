@@ -14,7 +14,7 @@ public:
     //The pointcloud is 3D 
     void updatePointCloud(const sensor_msgs::PointCloud& new_point_cloud)//TODO seg faults if point cloud is empty
     {
-        std::cout << "Received new point cloud of size " << new_point_cloud.points.size() << " from SLAM alg. " << std::endl;
+        std::cout << "Received new point cloud of size " << new_point_cloud.points.size() << " from ORB-SLAM" << std::endl;
         //rebuild kdtree for each new point cloud
         if(kdtree!=nullptr)
             delete kdtree;
