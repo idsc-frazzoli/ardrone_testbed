@@ -165,8 +165,8 @@ class ScaleEstimator {
     
     vector<double> x_stream_, y_stream_, time_x_, time_y_;
     int scores[2500];
-    string scores_path_="scores_10_3";
-    float true_scale_ = 0.0283;
+    string scores_path_="scores_01_1";
+    float true_scale_ = 0.1104;
     
     int max_counter_ = 300;
     
@@ -237,21 +237,21 @@ public:
                             
                             data_array_.data.push_back(scale);
 
-                            cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
+//                             cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
                             double err = abs(true_scale - scale)/true_scale;
                             
-                            if ( err < 0.05) {
-                                scores[counter] +=5;
-                                cout << " CONVERGED WITHIN 5%" << endl;
-                            } else if (err < 0.1) {
-                                scores[counter] +=2;
-                                cout << " CONVERGED WITHIN 10%" << endl;
-                            } else if (err < 0.2) {
-                                scores[counter] +=1;
-                                cout << " CONVERGED WITHIN 20%" << endl;
-                            } else {
-                                cout << endl;
-                            }
+//                             if ( err < 0.05) {
+//                                 scores[counter] +=5;
+//                                 cout << " CONVERGED WITHIN 5%" << endl;
+//                             } else if (err < 0.1) {
+//                                 scores[counter] +=2;
+//                                 cout << " CONVERGED WITHIN 10%" << endl;
+//                             } else if (err < 0.2) {
+//                                 scores[counter] +=1;
+//                                 cout << " CONVERGED WITHIN 20%" << endl;
+//                             } else {
+//                                 cout << endl;
+//                             }
                             
                             counter++;
                         }
@@ -259,10 +259,10 @@ public:
                 }
             }
         }
-//         for (int i=0; i<2500; i++) {
-//             //cout << i << " : " <<scores[i] << " ";
-//         }
-        cout << endl << "====================================================" << endl;
+        for (int i=0; i<2500; i++) {
+            //cout << i << " : " <<scores[i] << " ";
+        }
+//         cout << endl << "====================================================" << endl;
         //data_array_ = data_array;
     }
 
@@ -366,7 +366,7 @@ public:
             
             
             
-            cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
+//             cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
 
             ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
             scale_vector_.push_back ( s );
