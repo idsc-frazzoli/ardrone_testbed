@@ -79,7 +79,23 @@ Plug in the AR-Drone and connect to it via Wifi from the computer you plan to ru
 
 6) Launch everything:
 
+roslaunch main.launch
 
+7) To fly the drone with the keyboard drive:
+
+-Put the cursor over the QT gui that pops up for keyboard drive node
+
+Emergency shutdown: Space Bar
+   Takeoff: Y
+      Land: H
+        Up: Q
+      Down: A
+ Turn Left: W
+Turn Right: R
+ Move Left: S
+Move Right: F
+   Forward: E
+  Backward: D
 
 ### For good scale estimation:
 Scale estimation is based on vertical motion so in the first few seconds of flight, flying the AR-Drone vertically will lead to a good scale estimate.
