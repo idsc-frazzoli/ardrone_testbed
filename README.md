@@ -85,17 +85,17 @@ roslaunch main.launch
 
 -Put the cursor over the QT gui that pops up for keyboard drive node
 
-Emergency shutdown: Space Bar
-   Takeoff: Y
-      Land: H
-        Up: Q
-      Down: A
- Turn Left: W
-Turn Right: R
- Move Left: S
-Move Right: F
-   Forward: E
-  Backward: D
+Emergency shutdown: Space Bar__
+   Takeoff: Y__
+      Land: H__
+        Up: Q__
+      Down: A__
+ Turn Left: W__
+Turn Right: R__
+ Move Left: S__
+Move Right: F__
+   Forward: E__
+  Backward: D__
 
 ### For good scale estimation:
 Scale estimation is based on vertical motion so in the first few seconds of flight, flying the AR-Drone vertically will lead to a good scale estimate.
