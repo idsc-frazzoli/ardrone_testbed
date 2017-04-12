@@ -1,7 +1,17 @@
+/*
+ * Copyright 2017 Brian Paden
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud.h>
 #include <kdtree.h>
-// #include <glc_interface.h>
 #include <time.h>
 
 typedef std::valarray<double> vctr;
@@ -177,10 +187,10 @@ int main(int argc, char **argv)
       
         ros::spinOnce();
       
-        //Time 100,000 collision checking queries
+        //Time 1,000 collision checking queries
         Trajectory traj;
         vctr x1(3);
-        for(int i=1;i<100000;i++){
+        for(int i=1;i<1000;i++){
             x1[0]=fmod(x1[0]+1,8);
             x1[1]=fmod(x1[1]+1,2.73569);
             x1[2]=fmod(x1[2]+1,3.14159);
@@ -190,7 +200,7 @@ int main(int argc, char **argv)
         clock_t t=clock();
         
         std::cout << "Collision Free? " << obstacles.collisionFree(traj) << std::endl;
-        std::cout << "Checked 100,000 points for collision in " << ((float)(clock()-t))/CLOCKS_PER_SEC << std::endl;
+        std::cout << "Checked 1,000 points for collision in " << ((float)(clock()-t))/CLOCKS_PER_SEC << std::endl;
 
         loop_rate.sleep();
     }
