@@ -1,3 +1,5 @@
+// dh: there is an update available for this file
+// ... see https://github.com/idsc-frazzoli/linear-systems
 #ifndef LINEAR_SYSTEM_H
 #define LINEAR_SYSTEM_H
 #include<cmath>

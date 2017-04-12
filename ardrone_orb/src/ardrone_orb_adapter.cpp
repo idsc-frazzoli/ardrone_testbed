@@ -1,3 +1,4 @@
+// dh: authorship
 /**
  * This file is part of ORB-SLAM2.
  *
@@ -119,6 +120,7 @@ int main ( int argc, char **argv ) {
     ros::Publisher pointcloud_pub = nodeHandler.advertise<sensor_msgs::PointCloud> ( "/orb/point_cloud", 2 );
     ros::Publisher pose_pub = nodeHandler.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/orb/pose_unscaled", 2 );
 
+// dh: 30 and 15 are related magic consts, use a single magic const instead
     ros::Rate loop_rate ( 30 );
     int counter = 0;
 
@@ -257,6 +259,7 @@ void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
         } else
             br_.sendTransform ( tf::StampedTransform ( pose_out , t, "odom", "/orb_pose_unscaled" ) );
 
+// dh: code for covariance below into separate function(pose_out)
         //generate pose for robot_localization EKF sensor fusion
         //the pose is simply generated from the above derived transformations
         pose_out_.header.stamp = t;
@@ -284,6 +287,7 @@ void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
         pose_out_.pose.covariance[35] = 0.1;
     }
 
+// dh: code block below into separate function()
     // gets points from most recent frame
     // gets all points
     const std::vector<ORB_SLAM2::MapPoint *> &point_cloud = mpSLAM_->mpMap->GetAllMapPoints();
