@@ -81,8 +81,8 @@ public:
         log_likelihood_ = computeLogLikelihood ( orb_z_, nav_z_, realDisplacement_, lambdaPointEstimate_, orb_noise_, nav_noise_ );
     }
 
-    inline bool isInlier ( float orb_tol, float nav_tol ) {
-        return abs ( nav_z_ ) > nav_tol && abs ( orb_z_ ) > orb_tol;
+    inline bool isInlier ( float orb_tol, float orb_max_tol, float nav_tol ) {
+        return abs ( nav_z_ ) > nav_tol && abs ( orb_z_ ) > orb_tol && abs ( orb_z_ ) < orb_max_tol;
     }
 
     inline bool operator < ( const ScaleStruct& comp ) const {
@@ -157,7 +157,17 @@ class ScaleEstimator {
     double P_lower_bound_ = 1;
     double P_upper_bound_ = 1;
     
+    double f = 30;
+    double left_pole_orb = f*3.14*2;
+    double right_pole_orb = f*3.14*2;
+    double left_pole_nav = f*3.14*2;
+    double right_pole_nav = f*3.14*2;
+    
     vector<double> x_stream_, y_stream_, time_x_, time_y_;
+    int scores[2500];
+    string scores_path_="scores_01_1";
+    float true_scale_ = 0.1104;
+    
 
 
 public:
@@ -168,14 +178,18 @@ public:
         T_correction_.setIdentity();
         filt_pose_.pose.pose.position.x = filt_pose_.pose.pose.position.y = filt_pose_.pose.pose.position.z = 0;
         filt_pose_.pose.pose.orientation.x = filt_pose_.pose.pose.orientation.y = filt_pose_.pose.pose.orientation.z =filt_pose_.pose.pose.orientation.w = 0;
+        for (int i=0; i<2500; i++)
+        {
+            scores[i] = 0;
+        }
     }
 
-    double filterScale ( vector<ScaleStruct> scale_vctr, double ratio, double orb_tol, double nav_tol, double orb_noise, double nav_noise , int cut_off ) {
+    double filterScale ( vector<ScaleStruct> scale_vctr, double ratio, double orb_tol, double orb_max_tol, double nav_tol, double orb_noise, double nav_noise , int cut_off ) {
 
         vector<ScaleStruct> temp;
         for ( int i=0; i<scale_vctr.size(); i++ ) {
 
-            if ( scale_vctr[i].isInlier ( orb_tol, nav_tol ) ) {
+            if ( scale_vctr[i].isInlier ( orb_tol, orb_max_tol, nav_tol ) ) {
                 temp.push_back ( scale_vctr[i] );
             }
         }
@@ -208,33 +222,45 @@ public:
         return ScaleStruct::computeEstimator ( S_xx_z, S_yy_z, S_xy_z, orb_noise, nav_noise );
     }
 
-    void plotBatchScales ( vector<float> orb_tol, vector<float> nav_tol, vector<float> ratios, vector<float> variances ) {
+    void plotBatchScales ( vector<float> orb_tol, vector<float> orb_max_tol, vector<float> nav_tol, vector<float> ratios, vector<float> variances, double true_scale ) {
         //debug
         int counter = 0;
+        for (int om = 0; om<orb_max_tol.size(); om++) {
+            for ( int r = 0; r < ratios.size(); r++ ) {
+                for ( int v = 0; v < variances.size(); v++ ) {
+                    for ( int o =0; o< orb_tol.size(); o++ ) {
+                        for ( int n=0; n< nav_tol.size(); n++ ) {
 
-        std_msgs::Float32MultiArray data_array;
-        float x = latest_pose_.pose.pose.position.x;
-        float y = latest_pose_.pose.pose.position.y;
-        float z = latest_pose_.pose.pose.position.z;
+                            double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], orb_max_tol[om], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , 1e6 );    
+                            
+                            data_array_.data.push_back(scale);
 
-        for ( int r = 0; r < ratios.size(); r++ ) {
-            for ( int v = 0; v < variances.size(); v++ ) {
-                for ( int o =0; o< orb_tol.size(); o++ ) {
-                    for ( int n=0; n< nav_tol.size(); n++ ) {
-
-                        double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , 1e6 );
-
-                        data_array.data.push_back ( scale );
-                        cout << " s: " << scale << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " r: " << ratios[r] << " v: " << variances[v]  ;
-                        cout << " x: " << x / scale;
-                        cout << " y: " << y / scale;
-                        cout << " z: " << z / scale << " id: " << counter << endl;
-                        counter++;
+//                             cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
+                            double err = abs(true_scale - scale)/true_scale;
+                            
+//                             if ( err < 0.05) {
+//                                 scores[counter] +=5;
+//                                 cout << " CONVERGED WITHIN 5%" << endl;
+//                             } else if (err < 0.1) {
+//                                 scores[counter] +=2;
+//                                 cout << " CONVERGED WITHIN 10%" << endl;
+//                             } else if (err < 0.2) {
+//                                 scores[counter] +=1;
+//                                 cout << " CONVERGED WITHIN 20%" << endl;
+//                             } else {
+//                                 cout << endl;
+//                             }
+                            
+                            counter++;
+                        }
                     }
                 }
             }
         }
-        cout << endl << "====================================================" << endl;
+        for (int i=0; i<2500; i++) {
+            //cout << i << " : " <<scores[i] << " ";
+        }
+//         cout << endl << "====================================================" << endl;
         //data_array_ = data_array;
     }
 
@@ -243,13 +269,13 @@ public:
         //o: 0.05 n: 0.01 r: 0.5 v: 0.7 x: 1.59891 y: -0.609929 z: 0.580346 id: 49
 
 
-        vector<float> ratios = {0.5, 0.00001/*, 0.4,0.6, 0.8, 0.9*/};
-        vector<float> variances = {0.00001/*, 0.3, 0.5, */,0.7, 0.9/*, 1.1, 2,*/, 500}; // orb_noise / nav_noise
-        vector<float> orb_tol = { 0.05/*, 0.01, 0.005, 0*/};
-        vector<float> nav_tol = { /*0.05,*/ 0.01/*, 0.005, 0*/};
-
-        plotBatchScales ( orb_tol, nav_tol, ratios, variances );
-
+        vector<float> ratios = {0.0001, 0.1, 0.2, 0.4,0.6, 0.9};
+        vector<float> variances = {0.1, 0.2, 0.3,0.4, 0.5, 1, 2, 5, 10}; // orb_noise / nav_noise
+        vector<float> orb_tol = { 0, 0.005, 0.01};
+        vector<float> nav_tol = { 0, 0.005, 0.01};
+        vector<float> orb_max_tol = { .5, .4, .3, .2,.1};
+        
+        plotBatchScales ( orb_tol, orb_max_tol, nav_tol, ratios, variances,  true_scale_);
 // 			if (hasFixedScale()) return;
 // 			else {scale_ = filterScale ( scale_vector_, ratios, angles, orb_tol, nav_tol, nav_noise_ * variance, nav_noise_ , 1e6 );
 
@@ -276,19 +302,25 @@ public:
             return;
         }
 
-        double pole2Hz = 0.05*3.14*2;
-        double pole5Hz = 0.05*3.14*2;
-
         //numerator and denominator of transfer function
-        LTI::array num ( 2 ),den ( 3 );
-        num[0]=0;
-        num[1]=pole2Hz * pole5Hz;
-        den[0]=pole2Hz * pole5Hz;
-        den[1]=pole2Hz + pole5Hz;
-        den[2]=1;
-
+        LTI::array num_orb ( 2 ),den_orb ( 3 );
+        num_orb[0]=0;
+        num_orb[1]=left_pole_orb * right_pole_orb;
+        
+        den_orb[0]=left_pole_orb * right_pole_orb;
+        den_orb[1]=left_pole_orb + right_pole_orb;
+        den_orb[2]=1;
         
 
+        //numerator and denominator of transfer function
+        LTI::array num_nav ( 2 ),den_nav ( 3 );
+        num_nav[0]=0;
+        num_nav[1]=left_pole_nav * right_pole_nav;
+        
+        den_nav[0]=left_pole_nav * right_pole_nav;
+        den_nav[1]=left_pole_nav + right_pole_nav;
+        den_nav[2]=1;
+        
         while ( not orb_data_queue_.empty() ) {
 
             // get first orb msg
@@ -296,10 +328,9 @@ public:
             orb_data_queue_.pop_back();
 
             if ( first_orb_msg_ ) {
-                cout << "resetting orb" << endl;
                 first_orb_msg_ = false;
 
-                orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, orb_msg.header.stamp.toSec(), 0.00005 ) );
+                orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num_orb,den_orb, orb_msg.header.stamp.toSec(), 0.00005 ) );
             }
 
             double t = orb_msg.header.stamp.toSec();
@@ -314,13 +345,12 @@ public:
                 nav_data_queue_.pop_back();
 
                 if ( first_nav_msg_ ) {
-                    cout << "resetting nav" << endl;
                     first_nav_msg_ = false;
-                    nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num,den, nav_msg.header.stamp.toSec(), 0.00005 ) );
+                    nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num_nav,den_nav, nav_msg.header.stamp.toSec(), 0.00005 ) );
                 }
                 
                 time_y_.push_back(nav_msg.header.stamp.toSec());
-                y_stream_.push_back(nav_msg.altd/1000);
+                y_stream_.push_back(double(nav_msg.altd)/1000);
 
 
                 nav_z_->timeStep ( nav_msg.header.stamp.toSec(), double ( nav_msg.altd ) /1000.0 );
@@ -334,18 +364,25 @@ public:
             
             
             
-            cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
+//             cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
 
             ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
             scale_vector_.push_back ( s );
-
+            
+            data_array_.data.clear();
+            data_array_.data.push_back ( nav_signal_ );      
             estimateScale();
 
             updateLSScale ( orb_signal_, nav_signal_, Theta_upper_bound_, P_upper_bound_ );
             
-            data_array_.data.clear();
-            data_array_.data.push_back ( orb_signal_ / Theta_upper_bound_ );
-            data_array_.data.push_back ( nav_signal_ );
+            for (int i = 1; i < data_array_.data.size(); i++)
+            {
+                data_array_.data[i] = orb_signal_ / data_array_.data[i];
+            }
+            data_array_.data.push_back(orb_signal_ / Theta_upper_bound_);
+            cout << "LS: " << Theta_upper_bound_ << endl;
+            
+            
         }
     }
 
@@ -374,11 +411,14 @@ public:
     }
 
     void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
+//             cout << "ORB SEQ: " << msg.header.seq << endl;
         orb_data_queue_.push_front ( msg );
         latest_pose_ = msg;
     }
 
     void navCallback ( ardrone_autonomy::Navdata msg ) {
+
+//             cout << "NAV SEQ: " << msg.header.seq << endl;
         nav_data_queue_.push_front ( msg );
     }
 
@@ -398,16 +438,25 @@ public:
         ofstream x;
         x.open ( path+name_x );
         for ( int i=0; i<time_x_.size(); i++ ) {
-            x << x_stream_[i] << "," << time_x_[i] << std::endl;
+            x << to_string(x_stream_[i]) << "," << to_string(time_x_[i]) << std::endl;
         }
         x.close();
         
         ofstream y;
         y.open ( path+name_y );
         for ( int i=0; i<time_y_.size(); i++ ) {
-            y << y_stream_[i] << "," << time_y_[i] << std::endl;
+            y << to_string(y_stream_[i]) << "," << to_string(time_y_[i]) << std::endl;
         }
         y.close(); 
+    }
+    
+    void scoresToFile (const std::string& path) {
+        ofstream f;
+        f.open ( path + scores_path_ );
+        for ( int i=0; i<2500; i++ ) {
+            f << scores[i] << "," << endl;
+        }
+        f.close();
     }
 
 };
@@ -456,7 +505,8 @@ int main ( int argc, char **argv ) {
         loop_rate.sleep();
     }
 
-    scale_est.errorToFile("x_stream_bag_2", "y_stream_bag_2", "~/" );
+//     scale_est.errorToFile("x_stream_bag_2", "y_stream_bag_2", "./" );
+    scale_est.scoresToFile("./");
     
     return 0;
 }
