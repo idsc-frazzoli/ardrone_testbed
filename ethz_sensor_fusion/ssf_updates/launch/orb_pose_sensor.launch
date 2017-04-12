@@ -1,7 +1,0 @@
-<launch>
-    <node name="orb_pose_sensor" pkg="ssf_updates" type="orb_pose_sensor" clear_params="true" output="screen">
-	    <remap from="ssf_core/imu_state_input" to="/ardrone/imu" />
-	    <remap from="ssf_core/pose_measurement" to="/orb_pose_measurement" />
-	    <rosparam file="$(find ssf_updates)/orb_pose_sensor_fix.yaml"/>
-    </node>
-</launch>

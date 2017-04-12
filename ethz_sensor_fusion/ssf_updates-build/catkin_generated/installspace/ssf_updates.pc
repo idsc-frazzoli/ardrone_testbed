@@ -1,8 +1,0 @@
-prefix=/usr/local
-
-Name: ssf_updates
-Description: Description of ssf_updates
-Version: 0.1.0
-Cflags: -I/usr/local/include
-Libs: -L/usr/local/lib 
-Requires: roscpp ssf_core geometry_msgs

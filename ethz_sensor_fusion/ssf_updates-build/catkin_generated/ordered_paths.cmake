@@ -1,1 +1,0 @@
-set(ORDERED_PATHS "/home/max/ardrone_ws/devel/lib;/opt/ros/kinetic/lib")
