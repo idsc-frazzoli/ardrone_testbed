@@ -82,8 +82,6 @@ public:
 
     bool fixed_scale_ = false;
     double scale_ = 1; // has units m^-1
-    geometry_msgs::PoseWithCovarianceStamped filt_pose_;
-    geometry_msgs::PoseWithCovarianceStamped latest_pose_;
     vector<ScaleStruct> scale_vector_;
     const int max_counter_ = 350;
     int counter_ = 0;
@@ -191,24 +189,8 @@ public:
         }
     }
 
-    //Copies oldest message in orb msg buffer into internal pose variable
-    poseMsgStamped getScaledOrbPose() {
-
-        filt_pose_.header.stamp = latest_pose_.header.stamp;
-        filt_pose_.header.frame_id = "odom";
-
-        filt_pose_.pose.pose.orientation = latest_pose_.pose.pose.orientation;
-        filt_pose_.pose.pose.position.x = latest_pose_.pose.pose.position.x /scale_;
-        filt_pose_.pose.pose.position.y = latest_pose_.pose.pose.position.y /scale_;
-        filt_pose_.pose.pose.position.z = latest_pose_.pose.pose.position.z /scale_;
-
-        return filt_pose_;
-
-    }
-
     void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
         orb_data_queue_.push_front ( msg );
-        latest_pose_ = msg;
     }
 
     void navCallback ( ardrone_autonomy::Navdata msg ) {
@@ -238,9 +220,6 @@ int main ( int argc, char **argv ) {
     // subscribe to orb pose and accelerometer data from nav
     ros::Subscriber nav_sub = nh.subscribe ( "/ardrone/navdata", 30, &ScaleEstimator::navCallback, &scale_est );
 
-    // publish filtered orb pose
-    ros::Publisher scaled_orb_pub = nh.advertise<poseMsgStamped> ( "/ardrone/pose_scaled",2 );
-
     // publish scale
     ros::Publisher scale_pub = nh.advertise<std_msgs::Float32> ( "/scale_estimator/scale", 1 );
 
@@ -259,12 +238,10 @@ int main ( int argc, char **argv ) {
             scale_est.estimateScale();
         }
 
-        poseMsgStamped scale_pose_for_publish = scale_est.getScaledOrbPose();
         std_msgs::Float32 scale_for_publish;
         scale_for_publish.data = scale_est.getScale();
 
         scale_pub.publish ( scale_for_publish );
-        scaled_orb_pub.publish ( scale_pose_for_publish );
 
         loop_rate.sleep();
     }
