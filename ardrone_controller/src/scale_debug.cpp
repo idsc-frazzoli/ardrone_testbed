@@ -165,8 +165,8 @@ class ScaleEstimator {
     
     vector<double> x_stream_, y_stream_, time_x_, time_y_;
     int scores[2500];
-    string scores_path_="scores_01_1";
-    float true_scale_ = 0.1104;
+    string scores_path_="scores_04_3";
+    float true_scale_ = 0.0427;
     
 
 
@@ -238,18 +238,18 @@ public:
 //                             cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
                             double err = abs(true_scale - scale)/true_scale;
                             
-//                             if ( err < 0.05) {
-//                                 scores[counter] +=5;
+                            if ( err < 0.05) {
+                                scores[counter] +=5;
 //                                 cout << " CONVERGED WITHIN 5%" << endl;
-//                             } else if (err < 0.1) {
-//                                 scores[counter] +=2;
+                            } else if (err < 0.1) {
+                                scores[counter] +=2;
 //                                 cout << " CONVERGED WITHIN 10%" << endl;
-//                             } else if (err < 0.2) {
-//                                 scores[counter] +=1;
+                            } else if (err < 0.2) {
+                                scores[counter] +=1;
 //                                 cout << " CONVERGED WITHIN 20%" << endl;
-//                             } else {
+                            } else {
 //                                 cout << endl;
-//                             }
+                            }
                             
                             counter++;
                         }

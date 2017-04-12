@@ -58,7 +58,7 @@ class ScaleEstimator {
         nav_data_queue.clear();
         orb_data_queue.clear();
     }
-    
+
     void process_queue() {
         orbAverages.push_back ( get_average_z ( orb_data_queue ) );
         altAverages.push_back ( get_average_z ( nav_data_queue ) );
@@ -68,7 +68,7 @@ class ScaleEstimator {
 
     void estimate_scale() {
 
-        if ( scale_vector.size() > 120 ) return; //enough scales for accuracy
+        if ( scale_vector.size() > 40 ) return; //enough scales for accuracy
 
         if ( orbAverages.size() != altAverages.size() ) return; // TODO necessary?
 
@@ -80,15 +80,15 @@ class ScaleEstimator {
                           ( altAverages[3] + altAverages[4] + altAverages[5] ) ) / 3 ;
         double naive_scale = deltaX / deltaY;
 
-        if ( naive_scale == naive_scale && naive_scale > 0 ) { //covers for nan/inf and bad readings (negative scale)
+        if ( naive_scale == naive_scale && naive_scale > 0 ) { //covers for nan/inf and bad signal (negative scale)
             cout << "pushing back scale vector" << endl;
-            scale_vector.push_back ( naive_scale );   //naive scale
-            std::sort ( scale_vector.begin() ,scale_vector.end() );
+            scale_vector.push_back ( naive_scale );
+            std::sort ( scale_vector.begin() ,scale_vector.end() ); //for median
         }
 
-        if ( scale_vector.size() > 50 ) {
+        if ( scale_vector.size() > 10 ) {
             double scale_accumulated = 0.0;
-            double samples = 16;
+            double samples = 8;
             for ( int index = ( ( scale_vector.size() / 2 ) - ( samples / 2 ) ) ; index < ( ( scale_vector.size() / 2 ) + ( samples / 2 ) ) ; index++ ) {
                 scale_accumulated += scale_vector[index];
             }
@@ -103,9 +103,6 @@ class ScaleEstimator {
     }
     void estimate_pose() {
         if ( not isStarted ) return;
-
-        //cout << "orb: " << orb_orientation.getX() << endl << orb_orientation.getY() << endl << orb_orientation.getZ() << endl << orb_orientation.getW() << endl;
-        //cout << "yaw: " << yaw_correction_quat.getX() << endl << yaw_correction_quat.getY() << endl << yaw_correction_quat.getZ() << endl << yaw_correction_quat.getW() << endl;
 
         filt_pose.header.frame_id = "odom";
         filt_pose.header.stamp = ros::Time::now();
@@ -128,37 +125,19 @@ class ScaleEstimator {
         filt_pose.pose.pose.position.y = newest_orb_msg.pose.pose.position.y / scale;
         filt_pose.pose.pose.position.z = newest_orb_msg.pose.pose.position.z / scale; //TODO: Test if it is better to use the altd message for altitude
 
-        for ( auto & x : filt_pose.pose.covariance ) {
-            x = 0.0;
-        }
-        filt_pose.pose.covariance[0] = newest_orb_msg.pose.covariance[0] / scale;
-        filt_pose.pose.covariance[7] = newest_orb_msg.pose.covariance[7] / scale;
-        filt_pose.pose.covariance[14] = newest_orb_msg.pose.covariance[14] / scale;
-        filt_pose.pose.covariance[21] = newest_orb_msg.pose.covariance[21] / scale;
-        filt_pose.pose.covariance[28] = newest_orb_msg.pose.covariance[28] / scale;
-        filt_pose.pose.covariance[35] = newest_orb_msg.pose.covariance[35] / scale;
-
-        cout << "SCALED POSITION: " << endl
-        << "X: " << filt_pose.pose.pose.position.x << endl
-        << "Y: " << filt_pose.pose.pose.position.y << endl 		//debug
-        << "Z: " << filt_pose.pose.pose.position.z << endl;
-
+        //filt_pose.pose.covariance = newest_orb_msg.pose.covariance / scale;
 
         geometry_msgs::PoseStamped path_pose;
         path_pose.header.stamp = ros::Time::now();
         path_pose.header.frame_id = "odom";
 
         // orientation
-        path_pose.pose.orientation.x = filt_pose.pose.pose.orientation.x;
-        path_pose.pose.orientation.y = filt_pose.pose.pose.orientation.y;
-        path_pose.pose.orientation.z = filt_pose.pose.pose.orientation.z;
-        path_pose.pose.orientation.w = filt_pose.pose.pose.orientation.w;
+        path_pose.pose.orientation.= filt_pose.pose.pose.orientation;
 
         // position
-        path_pose.pose.position.x = newest_orb_msg.pose.pose.position.x / scale;
+        path_pose.pose.position.x = newest_orb_msg.pose.pose.position.x / scale; //TODO: Test if it is better to use the altd message for altitude
         path_pose.pose.position.y = newest_orb_msg.pose.pose.position.y / scale;
-        path_pose.pose.position.z = newest_orb_msg.pose.pose.position.z / scale; //TODO: Test if it is better to use the altd message for altitude
-        //TODO: Implement something that takes the nav_data.altd message if it is available (drone at maximum height of 4m) or elsewise orb.z / scale but calculate the offset in the z coordinate (after takeoff) anyway!!
+        path_pose.pose.position.z = newest_orb_msg.pose.pose.position.z / scale;//TODO: Implement something that takes the nav_data.altd message if it is available (drone at maximum height of 4m) or elsewise orb.z / scale but calculate the offset in the z coordinate (after takeoff) anyway!!
 
         poses.push_back ( path_pose );
     }
@@ -176,7 +155,7 @@ class ScaleEstimator {
     void orb_callback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
         orb_data_queue.push_back ( msg );
     }
-    
+
     void nav_callback ( ardrone_autonomy::Navdata msg ) {
         if ( isStarted ) {
             nav_data_queue.push_back ( msg );
@@ -190,7 +169,6 @@ class ScaleEstimator {
                 tf_listener.lookupTransform ( "/ardrone_base_link", "odom", ros::Time ( 0 ), yaw_after_jump_tf );
             } catch ( tf::LookupException e ) {
                 ROS_WARN ( "Failed to lookup transformation after yaw jump! Do not trust the direction of flight!" );
-
             }
 
             tf::Transform yaw_correction_transform = yaw_before_jump_tf * yaw_after_jump_tf;
@@ -202,7 +180,7 @@ class ScaleEstimator {
             tf_listener.lookupTransform ( "odom", "/ardrone_base_link", ros::Time ( 0 ), yaw_before_jump_tf ); //we keep updating yaw_correction_before_jump_tf as long as there is no jump
         }                                                                                                             //to make sure we have the latest coordinate frame before the jump
         catch ( tf::LookupException e ) {
-            cout << "failed to lookup ardrone_base_link - is the driver running?" << endl;
+            ROS_WARN ( "failed to lookup ardrone_base_link - is the driver running?" );
         }
     }
 
@@ -231,10 +209,10 @@ int main ( int argc, char **argv ) {
     cout << "Started scale estimation with rate " << rate << " Hz" << endl;
 
     while ( ros::ok() ) {
-         
+
         ros::spinOnce();
         loop_rate.sleep();
-        
+
         if ( scale_est.orb_data_queue.size() > 0 ) {
             scale_est.process_queue();
 
@@ -252,10 +230,10 @@ int main ( int argc, char **argv ) {
                 scale_est.reset_all();
             }
         }
-        
+
         scale_est.estimate_pose();
-        orb_scale_pub.publish(scale_est.filt_pose);
-        
+        orb_scale_pub.publish ( scale_est.filt_pose );
+
     }
 
     return 0;
