@@ -1,3 +1,4 @@
+// dh: this file can probably be removed. it is superseded by more recent version of linear_system.h
 #ifndef LINEAR_SYSTEM_H
 #define LINEAR_SYSTEM_H
 #include<cmath>

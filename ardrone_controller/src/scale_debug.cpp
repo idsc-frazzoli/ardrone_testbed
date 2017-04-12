@@ -1,3 +1,4 @@
+// dh: authorship
 #include <queue>
 #include <fstream>
 
@@ -22,6 +23,7 @@ typedef geometry_msgs::PoseWithCovarianceStamped poseMsgStamped;
 typedef geometry_msgs::Pose poseMsg;
 
 // directly copied from tum
+// dh: credit more accurately and move to separate file
 class ScaleStruct {
 public:
     double orb_z_;
@@ -91,6 +93,7 @@ public:
 };
 //
 
+// dh: utility functions to separate file(s)
 void printVector ( const std::string& str, const tf::Vector3& vctr ) {
     std::cout << str << ": (" << vctr.x() << "," << vctr.y() << "," << vctr.z() << ")" << std::endl;
 }
