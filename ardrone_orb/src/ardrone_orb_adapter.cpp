@@ -73,7 +73,7 @@ class ImageGrabber {
     bool is_started_ = false;
     int tracking_state_=0;
 
-    double scale_ = 0.1;
+    double scale_ = 1;
     double scale_init_ = 1;
 
     sensor_msgs::PointCloud pc_;
