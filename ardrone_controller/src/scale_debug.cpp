@@ -118,6 +118,11 @@ void printScaleStruct ( const std::string& str, const ScaleStruct& s ) {
 }
 
 class ScaleEstimator {
+    
+        
+
+
+public:
     std::shared_ptr<LTI::SisoSystem> nav_x_, nav_y_, nav_z_;
     std::shared_ptr<LTI::SisoSystem> orb_x_,orb_y_,orb_z_;
     bool first_orb_msg_, first_nav_msg_;
@@ -165,14 +170,12 @@ class ScaleEstimator {
     
     vector<double> x_stream_, y_stream_, time_x_, time_y_;
     int scores[2500];
-    string scores_path_="scores_01_1";
-    float true_scale_ = 0.1104;
+    string scores_path_="scores_10_3";
+    float true_scale_ = 0.0283;
     
-    int max_counter_ = 300;
-    
+    int max_counter_ = 350;
+    int counter_ = 0;
 
-
-public:
 
     ScaleEstimator() :orb_signal_ ( 0 ),nav_signal_ ( 0 ),first_orb_msg_ ( true ), first_nav_msg_ ( true ) {
         T_init_.setIdentity();
@@ -196,8 +199,9 @@ public:
             }
         }
 
+
         sort ( scale_vctr.begin(), scale_vctr.end() );
-        int counter = 0;
+        counter_ = 0;
 
         double median = ( scale_vctr.size() < 5 ) ? 1 : scale_vctr[ ( scale_vctr.size() +1 ) /2].lambdaPointEstimate_;
 
@@ -215,11 +219,12 @@ public:
                 S_xy_z += s.nav_z_ * s.orb_z_;
                 S_xx_z += s.orb_z_ * s.orb_z_;
 
-                counter++;
+                counter_++;
             }
         }
+        
 
-        if ( counter > cut_off ) fixed_scale_ = true;
+        if ( counter_ > cut_off ) fixed_scale_ = true;
 
         return ScaleStruct::computeEstimator ( S_xx_z, S_yy_z, S_xy_z, orb_noise, nav_noise );
     }
@@ -237,21 +242,21 @@ public:
                             
                             data_array_.data.push_back(scale);
 
-//                             cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
+                            cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
                             double err = abs(true_scale - scale)/true_scale;
                             
-//                             if ( err < 0.05) {
-//                                 scores[counter] +=5;
-//                                 cout << " CONVERGED WITHIN 5%" << endl;
-//                             } else if (err < 0.1) {
-//                                 scores[counter] +=2;
-//                                 cout << " CONVERGED WITHIN 10%" << endl;
-//                             } else if (err < 0.2) {
-//                                 scores[counter] +=1;
-//                                 cout << " CONVERGED WITHIN 20%" << endl;
-//                             } else {
-//                                 cout << endl;
-//                             }
+                            if ( err < 0.05) {
+                                scores[counter] +=5;
+                                cout << " CONVERGED WITHIN 5%" << endl;
+                            } else if (err < 0.1) {
+                                scores[counter] +=2;
+                                cout << " CONVERGED WITHIN 10%" << endl;
+                            } else if (err < 0.2) {
+                                scores[counter] +=1;
+                                cout << " CONVERGED WITHIN 20%" << endl;
+                            } else {
+                                cout << endl;
+                            }
                             
                             counter++;
                         }
@@ -259,9 +264,9 @@ public:
                 }
             }
         }
-        for (int i=0; i<2500; i++) {
-            //cout << i << " : " <<scores[i] << " ";
-        }
+//         for (int i=0; i<2500; i++) {
+//             //cout << i << " : " <<scores[i] << " ";
+//         }
 //         cout << endl << "====================================================" << endl;
         //data_array_ = data_array;
     }
@@ -493,10 +498,13 @@ int main ( int argc, char **argv ) {
 
         ros::spinOnce();
 
+        cout << "scale: " << scale_est.scale_ << endl;
+        cout << "counter: " << scale_est.counter_ << endl << endl;
+        
         scale_est.processQueue();//doesn't do anything if queue size less than 50
 
         data_pub.publish ( scale_est.getData() );
-
+        
         poseMsgStamped scale_pose_for_publish = scale_est.getScaledOrbPose();
         std_msgs::Float32 scale_for_publish;
         scale_for_publish.data = scale_est.getScale();
