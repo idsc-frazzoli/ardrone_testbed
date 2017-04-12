@@ -167,6 +167,8 @@ class ScaleEstimator {
     double right_pole_nav = f*3.14*2;
     
     vector<double> x_stream_, y_stream_, time_x_, time_y_;
+// dh: magic const appears in more than one location -> define value once and reuse
+// dh: is scores still needed?
     int scores[2500];
     string scores_path_="scores_01_1";
     float true_scale_ = 0.1104;
@@ -308,6 +310,7 @@ public:
         }
 
         //numerator and denominator of transfer function
+// dh: init of num and den is redundant -> extract to function and reuse
         LTI::array num_orb ( 2 ),den_orb ( 3 );
         num_orb[0]=0;
         num_orb[1]=left_pole_orb * right_pole_orb;
@@ -364,6 +367,7 @@ public:
             orb_z_->timeStep ( t, orb_msg.pose.pose.position.z );
 
             orb_signal_ = orb_z_->getOutput ( t );
+// dh: ensure that nav_z_ is initialized
             nav_signal_ = nav_z_->getOutput ( t );
             
             
@@ -372,6 +376,7 @@ public:
 //             cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
 
             ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
+// dh: growth of scale_vector_ is unbounded
             scale_vector_.push_back ( s );
             
             data_array_.data.clear();
@@ -391,7 +396,7 @@ public:
         }
     }
 
-
+// dh: method can be static
     void updateLSScale ( const double& y,const double& phi, double& theta, double& P ) {
         double K = P * phi / ( 1 + phi * P * phi );
 
@@ -402,7 +407,7 @@ public:
 
     //Copies oldest message in orb msg buffer into internal pose variable
     poseMsgStamped getScaledOrbPose() {
-
+// dh: better style to make filt_pose_ a local variable in this function
         filt_pose_.header.stamp = latest_pose_.header.stamp;
         filt_pose_.header.frame_id = "odom";
 
@@ -458,6 +463,7 @@ public:
     void scoresToFile (const std::string& path) {
         ofstream f;
         f.open ( path + scores_path_ );
+// dh: magic const 2500
         for ( int i=0; i<2500; i++ ) {
             f << scores[i] << "," << endl;
         }
