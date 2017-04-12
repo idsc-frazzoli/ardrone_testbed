@@ -1,8 +1,0 @@
-<launch>
-    <node name="viconpos_sensor" pkg="ssf_updates" type="viconpos_sensor" clear_params="true" output="screen">
-	    <remap from="ssf_core/imu_state_input" to="/auk/fcu/imu" />
-	    <remap from="ssf_core/position_measurement" to="vicon/auk/auk" />
-
-	    <rosparam file="$(find ssf_updates)/viconpos_sensor_fix.yaml"/>
-    </node>
-</launch>
