@@ -28,13 +28,10 @@ This package is the adaptor for the ORB_SLAM2 library into the ROS catkin framew
 This package contains a collision detection function that organizes the ORB-SLAM point cloud into a kd-tree for efficient distance querries between the ardrone and obstacles detected by ORB-SLAM
 
 ## Dependancies
-Robot Operating System (ROS): [ROS](http://wiki.ros.org/ROS/Installation)
-
-Open Computer Vision (OpenCV): [OpenCV](http://opencv.org)
-
-Eigen3: [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)
-
-Pangolin: [Pangolin](https://github.com/stevenlovegrove/Pangolin)
+Robot Operating System (ROS): [ROS](http://wiki.ros.org/ROS/Installation)  
+Open Computer Vision (OpenCV): [OpenCV](http://opencv.org)  
+Eigen3: [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)  
+Pangolin: [Pangolin](https://github.com/stevenlovegrove/Pangolin)  
 
 ## Getting Started
 
@@ -85,17 +82,17 @@ roslaunch main.launch
 
 -Put the cursor over the QT gui that pops up for keyboard drive node
 
-Emergency shutdown: Space Bar__
-   Takeoff: Y__
-      Land: H__
-        Up: Q__
-      Down: A__
- Turn Left: W__
-Turn Right: R__
- Move Left: S__
-Move Right: F__
-   Forward: E__
-  Backward: D__
+Emergency shutdown: Space Bar  
+   Takeoff: Y  
+      Land: H  
+        Up: Q  
+      Down: A  
+ Turn Left: W  
+Turn Right: R  
+ Move Left: S  
+Move Right: F  
+   Forward: E  
+  Backward: D  
 
-### For good scale estimation:
+### For good scale estimation:  
 Scale estimation is based on vertical motion so in the first few seconds of flight, flying the AR-Drone vertically will lead to a good scale estimate.
