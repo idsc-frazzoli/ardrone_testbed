@@ -166,7 +166,7 @@ class ScaleEstimator {
     vector<double> x_stream_, y_stream_, time_x_, time_y_;
     int scores[2500];
     string scores_path_="scores_01_1";
-    float true_scale_ = 0.1089;
+    float true_scale_ = 0.1104;
     
 
 
@@ -235,21 +235,21 @@ public:
                             
                             data_array_.data.push_back(scale);
 
-                            cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
+//                             cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
                             double err = abs(true_scale - scale)/true_scale;
                             
-                            if ( err < 0.05) {
-                                scores[counter] +=5;
-                                cout << " CONVERGED WITHIN 5%" << endl;
-                            } else if (err < 0.1) {
-                                scores[counter] +=2;
-                                cout << " CONVERGED WITHIN 10%" << endl;
-                            } else if (err < 0.2) {
-                                scores[counter] +=1;
-                                cout << " CONVERGED WITHIN 20%" << endl;
-                            } else {
-                                cout << endl;
-                            }
+//                             if ( err < 0.05) {
+//                                 scores[counter] +=5;
+//                                 cout << " CONVERGED WITHIN 5%" << endl;
+//                             } else if (err < 0.1) {
+//                                 scores[counter] +=2;
+//                                 cout << " CONVERGED WITHIN 10%" << endl;
+//                             } else if (err < 0.2) {
+//                                 scores[counter] +=1;
+//                                 cout << " CONVERGED WITHIN 20%" << endl;
+//                             } else {
+//                                 cout << endl;
+//                             }
                             
                             counter++;
                         }
@@ -260,7 +260,7 @@ public:
         for (int i=0; i<2500; i++) {
             //cout << i << " : " <<scores[i] << " ";
         }
-        cout << endl << "====================================================" << endl;
+//         cout << endl << "====================================================" << endl;
         //data_array_ = data_array;
     }
 
@@ -411,14 +411,14 @@ public:
     }
 
     void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
-            cout << "ORB SEQ: " << msg.header.seq << endl;
+//             cout << "ORB SEQ: " << msg.header.seq << endl;
         orb_data_queue_.push_front ( msg );
         latest_pose_ = msg;
     }
 
     void navCallback ( ardrone_autonomy::Navdata msg ) {
 
-            cout << "NAV SEQ: " << msg.header.seq << endl;
+//             cout << "NAV SEQ: " << msg.header.seq << endl;
         nav_data_queue_.push_front ( msg );
     }
 
