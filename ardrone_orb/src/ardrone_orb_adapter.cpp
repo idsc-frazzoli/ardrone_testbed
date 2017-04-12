@@ -1,21 +1,5 @@
-/**
- * This file is part of ORB-SLAM2.
- *
- * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
- * For more information see <https://github.com/raulmur/ORB_SLAM2>
- *
- * ORB-SLAM2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * ORB-SLAM2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
+/*
+ * This is a ROS AR-Drone adapter for the ORB-SLAM package
  */
 
 
@@ -52,6 +36,7 @@
 using namespace std;
 
 class ImageGrabber {
+    int image_counter=0;
 public:
     ImageGrabber ( ORB_SLAM2::System *pSLAM ) : mpSLAM_ ( pSLAM ), pc_() {
         pc_.header.frame_id = "/first_keyframe_cam";
@@ -124,8 +109,8 @@ int main ( int argc, char **argv ) {
 
     while ( ros::ok() ) {
         ros::spinOnce();
-        if ( igb.pc_init_  && counter % 15 == 0) {
-            pointcloud_pub.publish ( igb.pc_ ); //publish at 2 Hz
+        if ( igb.pc_init_  && counter % 30 == 0) {
+            pointcloud_pub.publish ( igb.pc_ ); //publish at 1 Hz
         }
 
         if (igb.pose_init_ && igb.tracking_state_ == 2) {
@@ -284,24 +269,27 @@ void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
         pose_out_.pose.covariance[35] = 0.1;
     }
 
-    // gets points from most recent frame
-    // gets all points
-    const std::vector<ORB_SLAM2::MapPoint *> &point_cloud = mpSLAM_->mpMap->GetAllMapPoints();
-    // TODO: make efficient (use mpSLAM->GetTrackedMapPoints() to get most recent points)
-    pc_.points.clear();
-    pc_.header.stamp = t;
-    
-    for ( size_t i = 0; i < point_cloud.size(); i++ ) {
-        if ( point_cloud[i]->isBad() /* or spRefMPs.count(vpMPs[i])*/ ) {
-            continue;
+    // Copy map into ros point cloud
+    image_counter++;
+    if(image_counter>30){
+        image_counter=0;
+        const std::vector<ORB_SLAM2::MapPoint *> &point_cloud = mpSLAM_->mpMap->GetAllMapPoints();
+        // TODO: make efficient (use mpSLAM->GetTrackedMapPoints() to get most recent points)
+        pc_.points.clear();
+        pc_.header.stamp = t;
+        
+        for ( size_t i = 0; i < point_cloud.size(); i++ ) {
+            if ( point_cloud[i]->isBad() /* or spRefMPs.count(vpMPs[i])*/ ) {
+                continue;
+            }
+            cv::Mat pos = point_cloud[i]->GetWorldPos();
+            geometry_msgs::Point32 pp;
+            pp.x = pos.at<float> ( 0 ) / ( scale_ * scale_init_ );
+            pp.y = pos.at<float> ( 1 ) / ( scale_ * scale_init_ );
+            pp.z = pos.at<float> ( 2 ) / ( scale_ * scale_init_ );
+            
+            pc_.points.push_back ( pp );
         }
-        cv::Mat pos = point_cloud[i]->GetWorldPos();
-        geometry_msgs::Point32 pp;
-        pp.x = pos.at<float> ( 0 ) / ( scale_ * scale_init_ );
-        pp.y = pos.at<float> ( 1 ) / ( scale_ * scale_init_ );
-        pp.z = pos.at<float> ( 2 ) / ( scale_ * scale_init_ );
-
-        pc_.points.push_back ( pp );
     }
 
 }
