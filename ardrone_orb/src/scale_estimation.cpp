@@ -113,9 +113,6 @@ public:
     const int max_counter_ = 350;
     int counter_ = 0;
 
-
-    ScaleEstimator() {}
-
     double filterScale ( vector<ScaleStruct> scale_vctr, double ratio, double std_orb, double std_nav , int cut_off ) {
 
         sort ( scale_vctr.begin(), scale_vctr.end() );
