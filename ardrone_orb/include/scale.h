@@ -6,6 +6,11 @@
  * Maximilian Goettgens (ETH Zurich)
  * Brian Paden (MIT)
  * 
+ * This file was originally written as part of the PTAM Wrapper by J. Engel, J. Sturm, 
+ * D. Cremers and has been modified by the authors to serve several tasks 
+ * needed for the ardrone to properly use the ORB SLAM 2 algorithm for state 
+ * estimation.
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining 
  * a copy of this software and associated documentation files (the "Software"), 
  * to deal in the Software without restriction, including without limitation 
