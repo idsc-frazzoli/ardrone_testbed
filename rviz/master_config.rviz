@@ -25,7 +25,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: FRONT CAMERA
 Visualization Manager:
   Class: ""
   Displays:
@@ -52,13 +52,46 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        ardrone_base_bottomcam:
+          Value: false
+        ardrone_base_frontcam:
+          Value: false
+        ardrone_base_link:
+          Value: false
+        first_keyframe_base_link:
+          Value: false
+        first_keyframe_cam:
+          Value: false
+        odom:
+          Value: true
+        orb_pose_unscaled:
+          Value: false
+        orb_pose_unscaled_cam:
+          Value: false
+        second_keyframe_base_link:
+          Value: false
+        second_keyframe_cam:
+          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        odom:
+          ardrone_base_link:
+            ardrone_base_bottomcam:
+              {}
+            ardrone_base_frontcam:
+              {}
+          second_keyframe_base_link:
+            second_keyframe_cam:
+              first_keyframe_cam:
+                first_keyframe_base_link:
+                  {}
+                orb_pose_unscaled_cam:
+                  orb_pose_unscaled:
+                    {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -112,8 +145,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: -0.245639563
-        Min Value: -0.920991838
+        Max Value: 2.30465245
+        Min Value: -2.75390267
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -192,10 +225,10 @@ Visualization Manager:
       Focal Shape Size: 0.0500000007
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.450398237
+      Pitch: 0.330398262
       Target Frame: odom
       Value: Orbit (rviz)
-      Yaw: 2.16539979
+      Yaw: 1.20039976
     Saved: ~
 Window Geometry:
   Displays:

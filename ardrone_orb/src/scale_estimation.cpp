@@ -29,14 +29,14 @@
 #include <math.h>
 #include <ros/ros.h>
 #include <std_msgs/Float32.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <geometry_msgs/PoseStamped.h>
 
 #include <ardrone_autonomy/Navdata.h>
 
 #include <linear_system.h>
 
 using namespace std;
-typedef geometry_msgs::PoseWithCovarianceStamped poseMsgStamped;
+typedef geometry_msgs::PoseStamped poseMsgStamped;
 typedef geometry_msgs::Pose poseMsg;
 
 // directly copied from tum
@@ -93,7 +93,7 @@ public:
     double nav_signal_=0;
     double filter_pole_ = 30 * M_PI * 2; // in radians
 
-    deque<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue_;
+    deque<geometry_msgs::PoseStamped> orb_data_queue_;
     deque<ardrone_autonomy::Navdata> nav_data_queue_;
     bool first_orb_msg_=true;
     bool first_nav_msg_=true;
@@ -168,7 +168,7 @@ public:
         while ( not orb_data_queue_.empty() ) {
 
             // get first orb msg
-            geometry_msgs::PoseWithCovarianceStamped orb_msg = orb_data_queue_.back();
+            geometry_msgs::PoseStamped orb_msg = orb_data_queue_.back();
             orb_data_queue_.pop_back();
 
             double t_orb = orb_msg.header.stamp.toSec();
@@ -197,7 +197,7 @@ public:
                 nav_z_->timeStep ( t_nav, alt );
             }
 
-            orb_z_->timeStep ( t_orb, orb_msg.pose.pose.position.z );
+            orb_z_->timeStep ( t_orb, orb_msg.pose.position.z );
 
             if (not first_nav_msg_ and not first_orb_msg_) {
                 orb_signal_ = orb_z_->getOutput ( t_orb );
@@ -209,7 +209,7 @@ public:
         }
     }
 
-    void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
+    void orbCallback ( geometry_msgs::PoseStamped msg ) {
         orb_data_queue_.push_front ( msg );
     }
 

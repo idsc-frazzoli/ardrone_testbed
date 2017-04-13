@@ -1,6 +1,4 @@
 <launch>
-<!-- launch drone controller -->
-  <node name="Controller" pkg="ardrone_controller" type="controller_node" output="screen" />
 
 <!-- launch orb -->
   <node name="ORB_mono" pkg="ardrone_orb" type="ros_orb_node" output="screen" args="$(find ardrone_orb)/ORBvoc.txt  $(find ardrone_orb)/settings.yaml">
@@ -41,6 +39,9 @@
         <rosparam param="cov/imu_or">[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 100000.0]</rosparam>
     </node>
 
+<!-- launch scale estimator-->
+  <node name="scale_estimation_node" pkg="ardrone_orb" type="scale_estimation_node" output="screen" />
+    
 </launch>
 
 

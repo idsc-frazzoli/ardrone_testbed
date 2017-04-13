@@ -56,11 +56,11 @@ class ScaleEstimator {
     vector<double> altAverages;
 
     vector<ardrone_autonomy::Navdata> nav_data_queue;
-    vector<geometry_msgs::PoseWithCovarianceStamped> orb_data_queue;
+    vector<geometry_msgs::PoseStamped> orb_data_queue;
     vector<geometry_msgs::PoseStamped> poses;
 
-    geometry_msgs::PoseWithCovarianceStamped newest_orb_msg;
-    geometry_msgs::PoseWithCovarianceStamped filt_pose;
+    geometry_msgs::PoseStamped newest_orb_msg;
+    geometry_msgs::PoseStamped filt_pose;
     nav_msgs::Path scaled_path;
 
     double get_average_z ( vector<ardrone_autonomy::Navdata> &queue ) {
@@ -71,7 +71,7 @@ class ScaleEstimator {
         }
         return data / counter / 1000;
     }
-    double get_average_z ( vector<geometry_msgs::PoseWithCovarianceStamped> &queue ) {
+    double get_average_z ( vector<geometry_msgs::PoseStamped> &queue ) {
         double data = 0;
         for ( int counter = 0 ; counter < queue.size() ; counter++ ) {
             data += queue[counter].pose.pose.position.z;
@@ -132,23 +132,23 @@ class ScaleEstimator {
         filt_pose.header.frame_id = "odom";
         filt_pose.header.stamp = ros::Time::now();
 
-        orb_orientation.setX ( newest_orb_msg.pose.pose.orientation.x );
-        orb_orientation.setY ( newest_orb_msg.pose.pose.orientation.y );
-        orb_orientation.setZ ( newest_orb_msg.pose.pose.orientation.z );
-        orb_orientation.setW ( newest_orb_msg.pose.pose.orientation.w );
+        orb_orientation.setX ( newest_orb_msg.pose.orientation.x );
+        orb_orientation.setY ( newest_orb_msg.pose.orientation.y );
+        orb_orientation.setZ ( newest_orb_msg.pose.orientation.z );
+        orb_orientation.setW ( newest_orb_msg.pose.orientation.w );
 
         orb_orientation =  orb_orientation * yaw_correction_quat; // TODO: Something still seems to be wrong with the yaw correction - we have to figure out exactly how to to the tf's and double check the implementation
 
         // orientation
-        filt_pose.pose.pose.orientation.x = orb_orientation.getX();
-        filt_pose.pose.pose.orientation.y = orb_orientation.getY();
-        filt_pose.pose.pose.orientation.z = orb_orientation.getZ();
-        filt_pose.pose.pose.orientation.w = orb_orientation.getW();
+        filt_pose.pose.orientation.x = orb_orientation.getX();
+        filt_pose.pose.orientation.y = orb_orientation.getY();
+        filt_pose.pose.orientation.z = orb_orientation.getZ();
+        filt_pose.pose.orientation.w = orb_orientation.getW();
 
         // position
-        filt_pose.pose.pose.position.x = newest_orb_msg.pose.pose.position.x / scale;
-        filt_pose.pose.pose.position.y = newest_orb_msg.pose.pose.position.y / scale;
-        filt_pose.pose.pose.position.z = newest_orb_msg.pose.pose.position.z / scale; //TODO: Test if it is better to use the altd message for altitude
+        filt_pose.pose.position.x = newest_orb_msg.pose.position.x / scale;
+        filt_pose.pose.position.y = newest_orb_msg.pose.position.y / scale;
+        filt_pose.pose.position.z = newest_orb_msg.pose.position.z / scale; //TODO: Test if it is better to use the altd message for altitude
 
         //filt_pose.pose.covariance = newest_orb_msg.pose.covariance / scale;
 
@@ -157,12 +157,12 @@ class ScaleEstimator {
         path_pose.header.frame_id = "odom";
 
         // orientation
-        path_pose.pose.orientation.= filt_pose.pose.pose.orientation;
+        path_pose.pose.orientation.= filt_pose.pose.orientation;
 
         // position
-        path_pose.pose.position.x = newest_orb_msg.pose.pose.position.x / scale; //TODO: Test if it is better to use the altd message for altitude
-        path_pose.pose.position.y = newest_orb_msg.pose.pose.position.y / scale;
-        path_pose.pose.position.z = newest_orb_msg.pose.pose.position.z / scale;//TODO: Implement something that takes the nav_data.altd message if it is available (drone at maximum height of 4m) or elsewise orb.z / scale but calculate the offset in the z coordinate (after takeoff) anyway!!
+        path_pose.pose.position.x = newest_orb_msg.pose.position.x / scale; //TODO: Test if it is better to use the altd message for altitude
+        path_pose.pose.position.y = newest_orb_msg.pose.position.y / scale;
+        path_pose.pose.position.z = newest_orb_msg.pose.position.z / scale;//TODO: Implement something that takes the nav_data.altd message if it is available (drone at maximum height of 4m) or elsewise orb.z / scale but calculate the offset in the z coordinate (after takeoff) anyway!!
 
         poses.push_back ( path_pose );
     }
@@ -228,6 +228,7 @@ int main ( int argc, char **argv ) {
     ros::Publisher filt_orb_pub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "/ardrone/pose_scaled",2 );
     ros::Publisher orb_scale_pub = nh.advertise<std_msgs::Float32> ( "/orb/scale", 2 );
     ros::Publisher path_pub = nh.advertise<nav_msgs::Path> ( "/ardrone/path",2 );
+    
 
     int rate = 20;
     ros::Rate loop_rate ( rate );
@@ -245,9 +246,9 @@ int main ( int argc, char **argv ) {
                 scale_est.estimate_scale();
 
                 orb_scale_pub.publish ( scale_est.scale );
-                filt_orb_pub.publish ( scale_est.filt_pose );
+                //filt_orb_pub.publish ( scale_est.filt_pose );
                 scale_est.update_path_array();
-                path_pub.publish ( scale_est.scaled_path );
+                //path_pub.publish ( scale_est.scaled_path );
 
                 scale_est.orbAverages.clear();
                 scale_est.altAverages.clear();
