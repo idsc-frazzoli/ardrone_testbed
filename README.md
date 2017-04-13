@@ -19,7 +19,15 @@ This is the SLAM library that is used for mapping and localization. It is cloned
 
 [Monocular slam repo](https://github.com/raulmur/ORB_SLAM2) 
 
-You will have to follow the setup and compilation instructions in the readme for this package carefully. 
+You will have to follow the setup and compilation instructions in the readme for this package carefully. This includes downlaod and installation of these dependencies:
+
+* **OpenCV**.
+BSD license.
+
+* **Eigen3**.
+For versions greater than 3.1.1 is MPL2, earlier versions are LGPLv3.
+
+and probably some more dependent on your system.
 
 ### ardrone_orb
 This package is the adaptor for the ORB_SLAM2 library into the ROS catkin framework. The settings.yaml file in this package contains camera calibration parameters for the AR-Drone camera. 

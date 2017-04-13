@@ -16,7 +16,6 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   tf
   message_generation
-  sensor_fusion_comm
   cv_bridge
   image_transport
   ardrone_autonomy
@@ -40,7 +39,6 @@ catkin_package(
   std_msgs 
   geometry_msgs 
   tf 
-  sensor_fusion_comm 
   cv_bridge 
   image_transport 
   message_runtime
@@ -48,7 +46,7 @@ catkin_package(
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp std_msgs sensor_fusion_comm message_runtime 
+  CATKIN_DEPENDS roscpp std_msgs message_runtime 
 )
 
 include_directories(
@@ -77,12 +75,13 @@ foreach(dir ${dirs})
 endforeach()
   
 
-add_executable(ros_orb_node src/ardrone_orb_adapter.cpp)
+add_executable(ros_orb_node src/orb_adapter.cpp src/ardrone_orb_adapter.cpp)
 add_executable(scale_estimation_node src/scale_estimation.cpp)
-
+add_library(scale_estimator src/scale_estimator.cpp)
 
 target_link_libraries(ros_orb_node ${LIBS})
 target_link_libraries(ros_orb_node ${catkin_LIBRARIES} )
 target_link_libraries(scale_estimation_node ${catkin_LIBRARIES} )
+target_link_libraries(scale_estimation_node scale_estimator)
 
 
