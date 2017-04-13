@@ -36,7 +36,6 @@
 #include <scale.h>
 #include <linear_system.h>
 
-
 using namespace std;
 
 class ScaleEstimator
