@@ -32,7 +32,7 @@ using namespace std;
 typedef geometry_msgs::PoseWithCovarianceStamped poseMsgStamped;
 typedef geometry_msgs::Pose poseMsg;
 
-// directly copied from tum
+// Adapted from tum
 class ScaleStruct {
 public:
     double orb_z_;
@@ -50,88 +50,119 @@ public:
     // inlier parameters
     float dot_prod_tol_ = 0.05;
     
-    static inline double computeEstimator ( double s_xx, double s_yy, double s_xy, double stdDevPTAM = 0.2, double stdDevIMU = 0.1 ) {
-        double sII = stdDevPTAM * stdDevPTAM * s_yy;
-        double sPP = stdDevIMU * stdDevIMU * s_xx;
-        double sPI = stdDevIMU * stdDevPTAM * s_xy;
+    static inline double computeEstimator ( double s_xx, 
+                                            double s_yy, 
+                                            double s_xy, 
+                                            double slam_std_dev = 0.2, 
+                                            double acoustic_sensor_std_dev = 0.1 ) {
+        double sII = slam_std_dev * slam_std_dev * s_yy;
+        double sPP = acoustic_sensor_std_dev * acoustic_sensor_std_dev * s_xx;
+        double sPI = acoustic_sensor_std_dev * slam_std_dev * s_xy;
         
         int sgn = copysign ( 1, s_xy );
         
         double tmp = ( sII-sPP ) * ( sII-sPP ) + 4*sPI*sPI;
-        if ( tmp <= 0 ) {
-            tmp = 1e-5; // numeric issues
-        }
-        return 0.5* ( - ( sII-sPP ) +sgn*sqrt ( tmp ) ) / ( stdDevIMU * stdDevIMU * s_xy );
+        if ( tmp <= 0 ) {tmp = 1e-5;} // numeric issues
+        return 0.5* ( - ( sII-sPP ) +sgn*sqrt ( tmp ) ) / ( acoustic_sensor_std_dev * acoustic_sensor_std_dev * s_xy );
         
     }
     
-    static inline double computeRealDisplacement ( double orb, double nav, double alpha, double stdDevPTAM = 0.01, double stdDevIMU = 0.2 ) {
-        double d = alpha * alpha * stdDevIMU * stdDevIMU + stdDevPTAM * stdDevPTAM;
-        double f1 = alpha * stdDevIMU * stdDevIMU / d;
-        double f2 = stdDevPTAM * stdDevPTAM / d;
+    //Equation (6) in TUM paper: generates most likely position given the two measurements
+    static inline double computeRealDisplacement ( double orb, 
+                                                   double nav, 
+                                                   double lambda, 
+                                                   double slam_std_dev = 0.01, 
+                                                   double acoustic_sensor_std_dev = 0.2 ) {
+        
+        double d = lambda * lambda * acoustic_sensor_std_dev * acoustic_sensor_std_dev + slam_std_dev * slam_std_dev;
+        double f1 = lambda * acoustic_sensor_std_dev * acoustic_sensor_std_dev / d;
+        double f2 = slam_std_dev * slam_std_dev / d;
         
         return orb * f1 + nav * f2;
     }
     
-    static inline double computeLogLikelihood ( double orb, double nav, double realDisplacement, double alpha, double stdDevPTAM, double stdDevImu ) {
-        double delta_p = orb - realDisplacement * alpha;
+    static inline double computeLogLikelihood ( double orb, 
+                                                double nav, 
+                                                double realDisplacement, 
+                                                double lambda, 
+                                                double slam_std_dev, 
+                                                double acoustic_sensor_std_dev ) {
+        
+        double delta_p = orb - realDisplacement * lambda;
         double delta_i = nav - realDisplacement;
         
-        return delta_p / ( stdDevPTAM * stdDevPTAM ) + delta_i / ( stdDevImu * stdDevImu );
+        return delta_p / ( slam_std_dev * slam_std_dev ) + delta_i / ( acoustic_sensor_std_dev * acoustic_sensor_std_dev );
     }
     
-    inline ScaleStruct ( double orb_z, double nav_z, double stdDevOrb, double stdDevNav ) {
+    inline ScaleStruct ( double orb_z, 
+                         double nav_z, 
+                         double slam_std_dev, 
+                         double acoustic_sensor_std_dev ) {
         orb_z_ = orb_z;
         nav_z_ = nav_z;
         
-        orb_noise_ = stdDevOrb;
-        nav_noise_ = stdDevNav;
+        orb_noise_ = slam_std_dev;
+        nav_noise_ = acoustic_sensor_std_dev;
         
-        lambdaPointEstimate_ = computeEstimator ( orb_z_*orb_z_, nav_z_*nav_z_, nav_z_*orb_z_, orb_noise_, nav_noise_ );
-        realDisplacement_ = computeRealDisplacement ( orb_z_, nav_z_, lambdaPointEstimate_, orb_noise_, nav_noise_ );
-        log_likelihood_ = computeLogLikelihood ( orb_z_, nav_z_, realDisplacement_, lambdaPointEstimate_, orb_noise_, nav_noise_ );
+        lambdaPointEstimate_ = computeEstimator ( orb_z_*orb_z_, 
+                                                  nav_z_*nav_z_, 
+                                                  nav_z_*orb_z_, 
+                                                  orb_noise_, 
+                                                  nav_noise_ );
+        
+        realDisplacement_ = computeRealDisplacement ( orb_z_, 
+                                                      nav_z_, 
+                                                      lambdaPointEstimate_, 
+                                                      orb_noise_, nav_noise_ );
+        log_likelihood_ = computeLogLikelihood ( orb_z_, 
+                                                 nav_z_, 
+                                                 realDisplacement_, 
+                                                 lambdaPointEstimate_, 
+                                                 orb_noise_, 
+                                                 nav_noise_ );
     }
     
+    //Data-point acceptance criteria
     inline bool isInlier ( float orb_tol, float orb_max_tol, float nav_tol ) {
         return abs ( nav_z_ ) > nav_tol && abs ( orb_z_ ) > orb_tol && abs ( orb_z_ ) < orb_max_tol && abs ( nav_z_ ) < .5;
     }
     
+    //Orders scale estimates on single data-points for median filter
     inline bool operator < ( const ScaleStruct& comp ) const {
         return lambdaPointEstimate_ < comp.lambdaPointEstimate_;
     }
 };
 //
 
-void printVector ( const std::string& str, const tf::Vector3& vctr ) {
-    std::cout << str << ": (" << vctr.x() << "," << vctr.y() << "," << vctr.z() << ")" << std::endl;
-}
-
-void printVector ( const std::string& str, const geometry_msgs::Pose& vctr ) {
-    std::cout << str << ": (" << vctr.position.x << "," << vctr.position.y << "," << vctr.position.z << ")" << std::endl;
-}
-
-void printVector ( const std::string& str, const geometry_msgs::PoseWithCovarianceStamped& vctr ) {
-    std::cout << str << ": (" << vctr.pose.pose.position.x << "," << vctr.pose.pose.position.y << "," << vctr.pose.pose.position.z << ")" << std::endl;
-}
-
-void printVector ( const std::string& str, const tf::StampedTransform& vctr ) {
-    std::cout << str << ": (" << vctr.getOrigin().getX() << "," << vctr.getOrigin().getY() << "," << vctr.getOrigin().getZ() << ")" << std::endl;
-}
-
-void printScaleStruct ( const std::string& str, const ScaleStruct& s ) {
-    std::cout << str << endl;
-    
-    std::cout << "scale: " << s.lambdaPointEstimate_ << "\t";
-    std::cout << "|x|: " << s.orbNorm_ << "\t";
-    std::cout << "|y|: " << s.navNorm_ << "\t";
-    std::cout << "l*|y|: " << s.lambdaPointEstimate_ * s.navNorm_ << endl;
-    std::cout << "logL: " << s.log_likelihood_ << "\t" << "angle: " << s.angle_ << endl;
-}
+// void printVector ( const std::string& str, const tf::Vector3& vctr ) {
+//     std::cout << str << ": (" << vctr.x() << "," << vctr.y() << "," << vctr.z() << ")" << std::endl;
+// }
+// 
+// void printVector ( const std::string& str, const geometry_msgs::Pose& vctr ) {
+//     std::cout << str << ": (" << vctr.position.x << "," << vctr.position.y << "," << vctr.position.z << ")" << std::endl;
+// }
+// 
+// void printVector ( const std::string& str, const geometry_msgs::PoseWithCovarianceStamped& vctr ) {
+//     std::cout << str << ": (" << vctr.pose.pose.position.x << "," << vctr.pose.pose.position.y << "," << vctr.pose.pose.position.z << ")" << std::endl;
+// }
+// 
+// void printVector ( const std::string& str, const tf::StampedTransform& vctr ) {
+//     std::cout << str << ": (" << vctr.getOrigin().getX() << "," << vctr.getOrigin().getY() << "," << vctr.getOrigin().getZ() << ")" << std::endl;
+// }
+// 
+// void printScaleStruct ( const std::string& str, const ScaleStruct& s ) {
+//     std::cout << str << endl;
+//     
+//     std::cout << "scale: " << s.lambdaPointEstimate_ << "\t";
+//     std::cout << "|x|: " << s.orbNorm_ << "\t";
+//     std::cout << "|y|: " << s.navNorm_ << "\t";
+//     std::cout << "l*|y|: " << s.lambdaPointEstimate_ * s.navNorm_ << endl;
+//     std::cout << "logL: " << s.log_likelihood_ << "\t" << "angle: " << s.angle_ << endl;
+// }
 
 class ScaleEstimator {
     std::shared_ptr<LTI::SisoSystem> nav_x_, nav_y_, nav_z_;
     std::shared_ptr<LTI::SisoSystem> orb_x_,orb_y_,orb_z_;
-    bool first_orb_msg_, first_nav_msg_;
     bool fixed_scale_ = false;
     float scale_ = 1; // has units m^-1
     float scale_ubound_ = 1;
@@ -185,19 +216,18 @@ class ScaleEstimator {
     
 public:
     
-    ScaleEstimator() :orb_signal_ ( 0 ),nav_signal_ ( 0 ),first_orb_msg_ ( true ), first_nav_msg_ ( true ) {
+    ScaleEstimator() :orb_signal_ ( 0 ),nav_signal_ ( 0 ) {
         T_init_.setIdentity();
         T_curr_.setIdentity();
         T_correction_.setIdentity();
         filt_pose_.pose.pose.position.x = filt_pose_.pose.pose.position.y = filt_pose_.pose.pose.position.z = 0;
         filt_pose_.pose.pose.orientation.x = filt_pose_.pose.pose.orientation.y = filt_pose_.pose.pose.orientation.z =filt_pose_.pose.pose.orientation.w = 0;
-        for (int i=0; i<2500; i++)
-        {
+        for (int i=0; i<2500; i++){
             scores[i] = 0;
         }
     }
     
-    double filterScale ( vector<ScaleStruct> scale_vctr, double ratio, double orb_tol, double orb_max_tol, double nav_tol, double orb_noise, double nav_noise , int cut_off ) {
+    double filterScale (vector<ScaleStruct>& scale_vctr, double ratio, double orb_tol, double orb_max_tol, double nav_tol, double orb_noise, double nav_noise , int cut_off ) {
         
         vector<ScaleStruct> temp;
         for ( int i=0; i<scale_vctr.size(); i++ ) {
@@ -214,8 +244,8 @@ public:
         
         // find sums and median.
         // do separately for xy and z and xyz-all and xyz-filtered
-        double S_yy_z, S_xx_z, S_xy_z;
-        S_yy_z = S_xx_z = S_xy_z = 0;
+        double S_yy_z(0), S_xx_z(0), S_xy_z(0);
+//         S_yy_z = S_xx_z = S_xy_z = 0;
         
         for ( unsigned int i=0; i<temp.size(); i++ ) {
             
@@ -235,47 +265,47 @@ public:
         return ScaleStruct::computeEstimator ( S_xx_z, S_yy_z, S_xy_z, orb_noise, nav_noise );
     }
     
-    void plotBatchScales ( vector<float> orb_tol, vector<float> orb_max_tol, vector<float> nav_tol, vector<float> ratios, vector<float> variances, double true_scale ) {
-        //debug
-        int counter = 0;
-        for (int om = 0; om<orb_max_tol.size(); om++) {
-            for ( int r = 0; r < ratios.size(); r++ ) {
-                for ( int v = 0; v < variances.size(); v++ ) {
-                    for ( int o =0; o< orb_tol.size(); o++ ) {
-                        for ( int n=0; n< nav_tol.size(); n++ ) {
-                            
-                            double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], orb_max_tol[om], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , max_counter_ );    
-                            
-                            data_array_.data.push_back(scale);
-                            
-                            //                             cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
-                            double err = abs(true_scale - scale)/true_scale;
-                            
-                            //                             if ( err < 0.05) {
-                            //                                 scores[counter] +=5;
-                            //                                 cout << " CONVERGED WITHIN 5%" << endl;
-                            //                             } else if (err < 0.1) {
-                            //                                 scores[counter] +=2;
-                            //                                 cout << " CONVERGED WITHIN 10%" << endl;
-                            //                             } else if (err < 0.2) {
-                            //                                 scores[counter] +=1;
-                            //                                 cout << " CONVERGED WITHIN 20%" << endl;
-                            //                             } else {
-                            //                                 cout << endl;
-                            //                             }
-                            
-                            counter++;
-                        }
-                    }
-                }
-            }
-        }
-        for (int i=0; i<2500; i++) {
-            //cout << i << " : " <<scores[i] << " ";
-        }
-        //         cout << endl << "====================================================" << endl;
-        //data_array_ = data_array;
-    }
+//     void plotBatchScales ( vector<float> orb_tol, vector<float> orb_max_tol, vector<float> nav_tol, vector<float> ratios, vector<float> variances, double true_scale ) {
+//         //debug
+//         int counter = 0;
+//         for (int om = 0; om<orb_max_tol.size(); om++) {
+//             for ( int r = 0; r < ratios.size(); r++ ) {
+//                 for ( int v = 0; v < variances.size(); v++ ) {
+//                     for ( int o =0; o< orb_tol.size(); o++ ) {
+//                         for ( int n=0; n< nav_tol.size(); n++ ) {
+//                             
+//                             double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], orb_max_tol[om], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , max_counter_ );    
+//                             
+//                             data_array_.data.push_back(scale);
+//                             
+//                             //                             cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
+//                             double err = abs(true_scale - scale)/true_scale;
+//                             
+//                             //                             if ( err < 0.05) {
+//                             //                                 scores[counter] +=5;
+//                             //                                 cout << " CONVERGED WITHIN 5%" << endl;
+//                             //                             } else if (err < 0.1) {
+//                             //                                 scores[counter] +=2;
+//                             //                                 cout << " CONVERGED WITHIN 10%" << endl;
+//                             //                             } else if (err < 0.2) {
+//                             //                                 scores[counter] +=1;
+//                             //                                 cout << " CONVERGED WITHIN 20%" << endl;
+//                             //                             } else {
+//                             //                                 cout << endl;
+//                             //                             }
+//                             
+//                             counter++;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//         for (int i=0; i<2500; i++) {
+//             //cout << i << " : " <<scores[i] << " ";
+//         }
+//         //         cout << endl << "====================================================" << endl;
+//         //data_array_ = data_array;
+//     }
     
     void estimateScale() {//TODO ugly code
         
@@ -294,28 +324,26 @@ public:
         
     }
     
-    void printAll() {
-        //This gets called at every iteration of the ros loop
-        float cur_orb_z = latest_pose_.pose.pose.position.x;
-        float cur_orb_y = latest_pose_.pose.pose.position.y;
-        float cur_orb_x = latest_pose_.pose.pose.position.z;
-        
-        tf::Vector3 orb_pos = tf::Vector3 ( latest_pose_.pose.pose.position.x, latest_pose_.pose.pose.position.y, latest_pose_.pose.pose.position.z );
-        tf::Vector3 pos = orb_pos * 1 / scale_;
-        
-        printVector ( "position unscaled", orb_pos );
-        printVector ( "position", pos );
-        
-        cout <<"s: " << scale_ << endl;
-    }
+//     void printAll() {
+//         //This gets called at every iteration of the ros loop
+//         float cur_orb_z = latest_pose_.pose.pose.position.x;
+//         float cur_orb_y = latest_pose_.pose.pose.position.y;
+//         float cur_orb_x = latest_pose_.pose.pose.position.z;
+//         
+//         tf::Vector3 orb_pos = tf::Vector3 ( latest_pose_.pose.pose.position.x, latest_pose_.pose.pose.position.y, latest_pose_.pose.pose.position.z );
+//         tf::Vector3 pos = orb_pos * 1 / scale_;
+//         
+//         printVector ( "position unscaled", orb_pos );
+//         printVector ( "position", pos );
+//         
+//         cout <<"s: " << scale_ << endl;
+//     }
     
     void processQueue() {
         //Only process orb data if batch size is greater than 100
-        if ( orb_data_queue_.size() <1 ) {
-            return;
-        }
+        if ( orb_data_queue_.size() <1 ) {return;}
         
-        //numerator and denominator of transfer function
+        //numerator and denominator of pre-filter transfer function
         LTI::array num_orb ( 2 ),den_orb ( 3 );
         num_orb[0]=0;
         num_orb[1]=left_pole_orb * right_pole_orb;
@@ -340,9 +368,7 @@ public:
             geometry_msgs::PoseWithCovarianceStamped orb_msg = orb_data_queue_.back();
             orb_data_queue_.pop_back();
             
-            if ( first_orb_msg_ ) {
-                first_orb_msg_ = false;
-                
+            if ( orb_z_.get()==nullptr ) {
                 orb_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num_orb,den_orb, orb_msg.header.stamp.toSec(), 0.00005 ) );
             }
             
@@ -357,8 +383,7 @@ public:
                 ardrone_autonomy::Navdata nav_msg = nav_data_queue_.back();
                 nav_data_queue_.pop_back();
                 
-                if ( first_nav_msg_ ) {
-                    first_nav_msg_ = false;
+                if ( nav_z_.get()==nullptr) {
                     nav_z_ = std::shared_ptr<LTI::SisoSystem> ( new LTI::SisoSystem ( num_nav,den_nav, nav_msg.header.stamp.toSec(), 0.00005 ) );
                 }
                 
@@ -370,15 +395,11 @@ public:
             }
             
             orb_z_->timeStep ( t, orb_msg.pose.pose.position.z );
-            
+
+            //Extrapolate orb and nav measurements at time t        
             orb_signal_ = orb_z_->getOutput ( t );
             nav_signal_ = nav_z_->getOutput ( t );
-            
-            
-            
-            
-            //             cout << "orb: " << orb_signal_ << " nav: " << nav_signal_ << endl;
-            
+
             ScaleStruct s = ScaleStruct ( orb_signal_, nav_signal_, orb_noise_, nav_noise_ );
             scale_vector_.push_back ( s );
             
@@ -388,23 +409,18 @@ public:
             
             updateLSScale ( orb_signal_, nav_signal_, Theta_upper_bound_, P_upper_bound_ );
             
-            for (int i = 1; i < data_array_.data.size(); i++)
-            {
+            for (int i = 1; i < data_array_.data.size(); i++){
                 data_array_.data[i] = orb_signal_ / data_array_.data[i];
             }
             data_array_.data.push_back(orb_signal_ / Theta_upper_bound_);
-            //cout << "LS: " << Theta_upper_bound_ << endl;
-            
-            
         }
     }
     
-    
+    //Simple recursive least squares
     void updateLSScale ( const double& y,const double& phi, double& theta, double& P ) {
+
         double K = P * phi / ( 1 + phi * P * phi );
-        
         theta += K * ( y - phi * theta );
-        
         P -= P * phi * K;
     }
     
@@ -420,18 +436,14 @@ public:
         filt_pose_.pose.pose.position.z = latest_pose_.pose.pose.position.z /scale_;
         
         return filt_pose_;
-        
     }
     
     void orbCallback ( geometry_msgs::PoseWithCovarianceStamped msg ) {
-        //             cout << "ORB SEQ: " << msg.header.seq << endl;
         orb_data_queue_.push_front ( msg );
         latest_pose_ = msg;
     }
     
     void navCallback ( ardrone_autonomy::Navdata msg ) {
-        
-        //             cout << "NAV SEQ: " << msg.header.seq << endl;
         nav_data_queue_.push_front ( msg );
     }
     
@@ -447,30 +459,30 @@ public:
         return data_array_;
     }
     
-    void errorToFile ( const std::string& name_x, const std::string& name_y,  const std::string& path) {
-        ofstream x;
-        x.open ( path+name_x );
-        for ( int i=0; i<time_x_.size(); i++ ) {
-            x << to_string(x_stream_[i]) << "," << to_string(time_x_[i]) << std::endl;
-        }
-        x.close();
-        
-        ofstream y;
-        y.open ( path+name_y );
-        for ( int i=0; i<time_y_.size(); i++ ) {
-            y << to_string(y_stream_[i]) << "," << to_string(time_y_[i]) << std::endl;
-        }
-        y.close(); 
-    }
-    
-    void scoresToFile (const std::string& path) {
-        ofstream f;
-        f.open ( path + scores_path_ );
-        for ( int i=0; i<2500; i++ ) {
-            f << scores[i] << "," << endl;
-        }
-        f.close();
-    }
+//     void errorToFile ( const std::string& name_x, const std::string& name_y,  const std::string& path) {
+//         ofstream x;
+//         x.open ( path+name_x );
+//         for ( int i=0; i<time_x_.size(); i++ ) {
+//             x << to_string(x_stream_[i]) << "," << to_string(time_x_[i]) << std::endl;
+//         }
+//         x.close();
+//         
+//         ofstream y;
+//         y.open ( path+name_y );
+//         for ( int i=0; i<time_y_.size(); i++ ) {
+//             y << to_string(y_stream_[i]) << "," << to_string(time_y_[i]) << std::endl;
+//         }
+//         y.close(); 
+//     }
+//     
+//     void scoresToFile (const std::string& path) {
+//         ofstream f;
+//         f.open ( path + scores_path_ );
+//         for ( int i=0; i<2500; i++ ) {
+//             f << scores[i] << "," << endl;
+//         }
+//         f.close();
+//     }
     
 };
 
