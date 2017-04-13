@@ -172,11 +172,8 @@ class ScaleEstimator {
     double P_lower_bound_ = 1;
     double P_upper_bound_ = 1;
     
-    double f = 30;
-    double left_pole_orb = f*3.14*2;
-    double right_pole_orb = f*3.14*2;
-    double left_pole_nav = f*3.14*2;
-    double right_pole_nav = f*3.14*2;
+    double f = 1.0;
+    double pole_location = 2*M_PI*f;
     
     vector<double> x_stream_, y_stream_, time_x_, time_y_;
     int scores[2500];
@@ -260,19 +257,19 @@ public:
         //numerator and denominator of pre-filter transfer function
         LTI::array num_orb ( 2 ),den_orb ( 3 );
         num_orb[0]=0;
-        num_orb[1]=left_pole_orb * right_pole_orb;
+        num_orb[1]=sqrt(pow(pow(pole_location,2.0)-1.0,2.0)+4.0*pow(pole_location,2));
         
-        den_orb[0]=left_pole_orb * right_pole_orb;
-        den_orb[1]=left_pole_orb + right_pole_orb;
+        den_orb[0]=pole_location * pole_location;
+        den_orb[1]=2.0*pole_location;
         den_orb[2]=1;
         
         //numerator and denominator of transfer function
         LTI::array num_nav ( 2 ),den_nav ( 3 );
         num_nav[0]=0;
-        num_nav[1]=left_pole_nav * right_pole_nav;
+        num_nav[1]=sqrt(pow(pow(pole_location,2.0)-1.0,2.0)+4.0*pow(pole_location,2));
         
-        den_nav[0]=left_pole_nav * right_pole_nav;
-        den_nav[1]=left_pole_nav + right_pole_nav;
+        den_nav[0]=pow(pole_location,2);
+        den_nav[1]=2.0*pole_location;
         den_nav[2]=1;
         
         while ( not orb_data_queue_.empty() ) {
