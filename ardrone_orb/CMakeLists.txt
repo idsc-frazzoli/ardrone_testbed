@@ -77,10 +77,11 @@ endforeach()
 
 add_executable(ros_orb_node src/ardrone_orb_adapter.cpp)
 add_executable(scale_estimation_node src/scale_estimation.cpp)
-
+add_library(scale_estimator src/scale_estimator.cpp)
 
 target_link_libraries(ros_orb_node ${LIBS})
 target_link_libraries(ros_orb_node ${catkin_LIBRARIES} )
 target_link_libraries(scale_estimation_node ${catkin_LIBRARIES} )
+target_link_libraries(scale_estimation_node scale_estimator)
 
 
