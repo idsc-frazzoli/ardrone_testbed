@@ -132,33 +132,6 @@ public:
         return lambdaPointEstimate_ < comp.lambdaPointEstimate_;
     }
 };
-//
-
-// void printVector ( const std::string& str, const tf::Vector3& vctr ) {
-//     std::cout << str << ": (" << vctr.x() << "," << vctr.y() << "," << vctr.z() << ")" << std::endl;
-// }
-// 
-// void printVector ( const std::string& str, const geometry_msgs::Pose& vctr ) {
-//     std::cout << str << ": (" << vctr.position.x << "," << vctr.position.y << "," << vctr.position.z << ")" << std::endl;
-// }
-// 
-// void printVector ( const std::string& str, const geometry_msgs::PoseWithCovarianceStamped& vctr ) {
-//     std::cout << str << ": (" << vctr.pose.pose.position.x << "," << vctr.pose.pose.position.y << "," << vctr.pose.pose.position.z << ")" << std::endl;
-// }
-// 
-// void printVector ( const std::string& str, const tf::StampedTransform& vctr ) {
-//     std::cout << str << ": (" << vctr.getOrigin().getX() << "," << vctr.getOrigin().getY() << "," << vctr.getOrigin().getZ() << ")" << std::endl;
-// }
-// 
-// void printScaleStruct ( const std::string& str, const ScaleStruct& s ) {
-//     std::cout << str << endl;
-//     
-//     std::cout << "scale: " << s.lambdaPointEstimate_ << "\t";
-//     std::cout << "|x|: " << s.orbNorm_ << "\t";
-//     std::cout << "|y|: " << s.navNorm_ << "\t";
-//     std::cout << "l*|y|: " << s.lambdaPointEstimate_ * s.navNorm_ << endl;
-//     std::cout << "logL: " << s.log_likelihood_ << "\t" << "angle: " << s.angle_ << endl;
-// }
 
 class ScaleEstimator {
     std::shared_ptr<LTI::SisoSystem> nav_x_, nav_y_, nav_z_;
@@ -243,9 +216,7 @@ public:
         double median = ( scale_vctr.size() < 5 ) ? 1 : scale_vctr[ ( scale_vctr.size() +1 ) /2].lambdaPointEstimate_;
         
         // find sums and median.
-        // do separately for xy and z and xyz-all and xyz-filtered
         double S_yy_z(0), S_xx_z(0), S_xy_z(0);
-//         S_yy_z = S_xx_z = S_xy_z = 0;
         
         for ( unsigned int i=0; i<temp.size(); i++ ) {
             
@@ -265,48 +236,6 @@ public:
         return ScaleStruct::computeEstimator ( S_xx_z, S_yy_z, S_xy_z, orb_noise, nav_noise );
     }
     
-//     void plotBatchScales ( vector<float> orb_tol, vector<float> orb_max_tol, vector<float> nav_tol, vector<float> ratios, vector<float> variances, double true_scale ) {
-//         //debug
-//         int counter = 0;
-//         for (int om = 0; om<orb_max_tol.size(); om++) {
-//             for ( int r = 0; r < ratios.size(); r++ ) {
-//                 for ( int v = 0; v < variances.size(); v++ ) {
-//                     for ( int o =0; o< orb_tol.size(); o++ ) {
-//                         for ( int n=0; n< nav_tol.size(); n++ ) {
-//                             
-//                             double scale = filterScale ( scale_vector_, ratios[r], orb_tol[o], orb_max_tol[om], nav_tol[n], nav_noise_ * variances[v], nav_noise_ , max_counter_ );    
-//                             
-//                             data_array_.data.push_back(scale);
-//                             
-//                             //                             cout << " s: " << scale << " r: " << ratios[r] << " v: " << variances[v] << " o: " << orb_tol[o] << " n: " << nav_tol[n] << " id: "<< counter ;
-//                             double err = abs(true_scale - scale)/true_scale;
-//                             
-//                             //                             if ( err < 0.05) {
-//                             //                                 scores[counter] +=5;
-//                             //                                 cout << " CONVERGED WITHIN 5%" << endl;
-//                             //                             } else if (err < 0.1) {
-//                             //                                 scores[counter] +=2;
-//                             //                                 cout << " CONVERGED WITHIN 10%" << endl;
-//                             //                             } else if (err < 0.2) {
-//                             //                                 scores[counter] +=1;
-//                             //                                 cout << " CONVERGED WITHIN 20%" << endl;
-//                             //                             } else {
-//                             //                                 cout << endl;
-//                             //                             }
-//                             
-//                             counter++;
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//         for (int i=0; i<2500; i++) {
-//             //cout << i << " : " <<scores[i] << " ";
-//         }
-//         //         cout << endl << "====================================================" << endl;
-//         //data_array_ = data_array;
-//     }
-    
     void estimateScale() {//TODO ugly code
         
         //o: 0.05 n: 0.01 r: 0.5 v: 0.7 x: 1.59891 y: -0.609929 z: 0.580346 id: 49
@@ -324,21 +253,6 @@ public:
         
     }
     
-//     void printAll() {
-//         //This gets called at every iteration of the ros loop
-//         float cur_orb_z = latest_pose_.pose.pose.position.x;
-//         float cur_orb_y = latest_pose_.pose.pose.position.y;
-//         float cur_orb_x = latest_pose_.pose.pose.position.z;
-//         
-//         tf::Vector3 orb_pos = tf::Vector3 ( latest_pose_.pose.pose.position.x, latest_pose_.pose.pose.position.y, latest_pose_.pose.pose.position.z );
-//         tf::Vector3 pos = orb_pos * 1 / scale_;
-//         
-//         printVector ( "position unscaled", orb_pos );
-//         printVector ( "position", pos );
-//         
-//         cout <<"s: " << scale_ << endl;
-//     }
-    
     void processQueue() {
         //Only process orb data if batch size is greater than 100
         if ( orb_data_queue_.size() <1 ) {return;}
@@ -351,7 +265,6 @@ public:
         den_orb[0]=left_pole_orb * right_pole_orb;
         den_orb[1]=left_pole_orb + right_pole_orb;
         den_orb[2]=1;
-        
         
         //numerator and denominator of transfer function
         LTI::array num_nav ( 2 ),den_nav ( 3 );
@@ -459,30 +372,6 @@ public:
         return data_array_;
     }
     
-//     void errorToFile ( const std::string& name_x, const std::string& name_y,  const std::string& path) {
-//         ofstream x;
-//         x.open ( path+name_x );
-//         for ( int i=0; i<time_x_.size(); i++ ) {
-//             x << to_string(x_stream_[i]) << "," << to_string(time_x_[i]) << std::endl;
-//         }
-//         x.close();
-//         
-//         ofstream y;
-//         y.open ( path+name_y );
-//         for ( int i=0; i<time_y_.size(); i++ ) {
-//             y << to_string(y_stream_[i]) << "," << to_string(time_y_[i]) << std::endl;
-//         }
-//         y.close(); 
-//     }
-//     
-//     void scoresToFile (const std::string& path) {
-//         ofstream f;
-//         f.open ( path + scores_path_ );
-//         for ( int i=0; i<2500; i++ ) {
-//             f << scores[i] << "," << endl;
-//         }
-//         f.close();
-//     }
     
 };
 
@@ -529,9 +418,6 @@ int main ( int argc, char **argv ) {
         
         loop_rate.sleep();
     }
-    
-    //scale_est.errorToFile("x_stream_bag_2", "y_stream_bag_2", "./../../../data/" );
-    //     scale_est.scoresToFile("./../../../data/");
     
     return 0;
 }
