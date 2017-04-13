@@ -43,6 +43,7 @@ class ScaleEstimator {
     public:
     float scale = 1; // has units m^-1
     bool isStarted = false;
+    bool isConverged = false;
 
     tf::Vector3 curr_orb_position;
     tf::Vector3 filt_position;
@@ -82,6 +83,8 @@ class ScaleEstimator {
     void reset_all() {
         nav_data_queue.clear();
         orb_data_queue.clear();
+        orbAverages.clear();
+        altAverages.clear();
     }
 
     void process_queue() {
@@ -93,7 +96,7 @@ class ScaleEstimator {
 
     void estimate_scale() {
 
-        if ( scale_vector.size() > 40 ) return; //enough scales for accuracy
+        if ( scale_vector.size() > 40 ){  isConverged = true; return;}; //enough scales for accuracy
 
         if ( orbAverages.size() != altAverages.size() ) return; // TODO necessary?
 
@@ -239,27 +242,15 @@ int main ( int argc, char **argv ) {
         ros::spinOnce();
         loop_rate.sleep();
 
-        if ( scale_est.orb_data_queue.size() > 0 ) {
+        if ( scale_est.orb_data_queue.size() > 0 && not scale_est.isConverged ) {
             scale_est.process_queue();
 
             if ( scale_est.orbAverages.size() > 5 ) {
                 scale_est.estimate_scale();
-
-                orb_scale_pub.publish ( scale_est.scale );
-                //filt_orb_pub.publish ( scale_est.filt_pose );
-                scale_est.update_path_array();
-                //path_pub.publish ( scale_est.scaled_path );
-
-                scale_est.orbAverages.clear();
-                scale_est.altAverages.clear();
-
                 scale_est.reset_all();
             }
         }
-
-        scale_est.estimate_pose();
-        orb_scale_pub.publish ( scale_est.filt_pose );
-
+        if (scale_est.isConverged) orb_scale_pub.publish ( scale_est.scale );
     }
 
     return 0;
