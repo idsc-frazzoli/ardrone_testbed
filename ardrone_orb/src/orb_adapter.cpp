@@ -53,7 +53,31 @@
 //See the rqt_tf_tree for further calrification on the single transformations this code is performing.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include<ardrone_orb_adapter.h>
+#include <ros/ros.h>
+
+#include <sensor_msgs/PointCloud.h>
+#include <cv_bridge/cv_bridge.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Vector3.h>
+#include <nav_msgs/Path.h>
+
+#include <tf2/LinearMath/Transform.h>
+#include <std_msgs/Float32.h>
+#include <ardrone_autonomy/Navdata.h>
+
+#include<opencv2/core/core.hpp>
+
+#include <System.h>
+#include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <tf/transform_datatypes.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+
+#include <ardrone_orb_adapter.h>
+
+using namespace std;
 
 int main ( int argc, char **argv ) {
     ros::init ( argc, argv, "Mono" );
