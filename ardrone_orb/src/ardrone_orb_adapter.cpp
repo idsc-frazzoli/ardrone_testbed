@@ -1,166 +1,67 @@
 /*
- * (c) 2017 
- * 
- * Authors: 
+ * (c) 2017
+ *
+ * Authors:
  * Daniel Gehrig (ETH Zurich)
  * Maximilian Goettgens (ETH Zurich)
  * Brian Paden (MIT)
- * 
- * Permission is hereby granted, free of charge, to any person obtaining 
- * a copy of this software and associated documentation files (the "Software"), 
- * to deal in the Software without restriction, including without limitation 
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, 
- * and/or sell copies of the Software, and to permit persons to whom the 
+ *
+ * This file was originally written as "ros_mono.cc" by Raul Mur-Artal and
+ * has been modified by the authors to serve several tasks needed for the
+ * ardrone to properly use the ORB SLAM 2 algorithm for state estimation.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
  * Software is furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included 
+ *
+ * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS 
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR 
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
  * IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#include <ros/ros.h>
 
-#include <sensor_msgs/PointCloud.h>
-#include <cv_bridge/cv_bridge.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Vector3.h>
-#include <nav_msgs/Path.h>
+//////////////////////////////////TRANSFORMATIONS//////////////////////////////////////////////////////////////////
+//To fuse the orb SLAM pose estimate with onboard sensor data, it is
+//necessary to publish any other sensor data and the orb SLAM data in the same parent frame which is typically
+//called 'odom'. See REP105 and REP103 on ros.org for further details on the concept.
+//
+//The final transformation for the orb SLAM looks like this:
+//
+//    odom --> second_keyframe_base_link --> second_keyframe_cam --> first_keyframe_cam
+//    --> orb_pose_unscaled_cam --> orb_pose_unscaled_base_link
+//
+//Odom is defined by the drone on startup (this is not the startup time of the driver node but the time the plug is connected)
+//Odom is defined with it's x-axis facing north and the negative z-axis aligned to the gravitation vector and must
+//not be changed at any time afterwards.
+//
+//The first and second keyframe transformation is set once the orb slam initializes (meaning it is able to estimate a position
+//for the first time). It is set to be the transformation from odom to ardrone_base_frontcam (published by the driver).
+//It is important to mention, that the first transformation, that is actually received from the ORB SLAM algorithm is the
+//transformation to the SECOND keyframe. There is a need to compensate for this to get a correct pose from the first keyframe on.
+//
+//Camera frames always come in a way such that the z axis is pointing forwards while the y axis is
+//facing downwards. Therefore the transformations to switch frames are here achieved through a manual rotation such that eventually
+//the orb pose values which are beeing publsihed to a PoseStamped topic represent the correct pose within the odom frame.
+//See the rqt_tf_tree for further calrification on the single transformations this code is performing.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <tf2/LinearMath/Transform.h>
-#include <std_msgs/Float32.h>
-#include <ardrone_autonomy/Navdata.h>
-
-#include<opencv2/core/core.hpp>
-
-#include <System.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
-#include <geometry_msgs/TransformStamped.h>
-#include <tf/transform_datatypes.h>
-#include <tf2/LinearMath/Matrix3x3.h>
-
-using namespace std;
-
-class ImageGrabber {
-    int image_counter=0;
-    public:
-    ImageGrabber ( ORB_SLAM2::System *pSLAM );
-    
-    void grabImage ( const sensor_msgs::ImageConstPtr &msg );
-    geometry_msgs::TransformStamped toTFStamped ( tf2::Transform in , ros::Time t, string frame_id, string child_frame_id );
-    bool isPointCloudValid();
-    void initializeTFTree(cv::Mat Tcw);
-    tf::Transform scaleTF(tf::Transform T, double scale);
-
-    void setScale ( std_msgs::Float32 msg ) {
-        scale_ = msg.data;
-    };
-    tf::Transform cvMatToTF ( cv::Mat Tcw );
-    double getAverageDepth ();
-    void navCallback ( ardrone_autonomy::Navdata msg ) ;
-
-    void writePoseOutUnscaled ( tf::Transform &transform, ros::Time &stamp );
-    void writePoseOutScaled ( geometry_msgs::PoseStamped &pose, double &scale );
-    void updatePathArray ();
-
-    ORB_SLAM2::System *mpSLAM_;
-
-    bool pose_init_ = false;
-    bool pc_init_ = false;
-    bool debug_mode_ = false;
-    bool is_started_ = false;
-    int tracking_state_=0;
-
-    double scale_ = 1;
-    double normalizer_ = 1;
-
-    sensor_msgs::PointCloud pc_;
-    geometry_msgs::PoseStamped pose_out_unscaled_;
-    geometry_msgs::PoseStamped pose_out_scaled_;
-
-    tf::TransformListener tf_listener_;
-
-    tf::TransformBroadcaster br_;
-
-    tf::StampedTransform base_link_to_camera_transform_;
-    tf::StampedTransform odom_to_second_keyframe_base_transform_;
-    tf::Transform second_keyframe_cam_to_first_keyframe_cam_transform_;
-    tf::StampedTransform base_link_to_camera_transform_no_translation_;
-    tf::StampedTransform yaw_before_jump_tf_;
-    tf::Transform yaw_correction_tf_ = tf::Transform ( tf::Quaternion ( 0,0,0,1 ) );
-
-    vector<geometry_msgs::PoseStamped> poses_;
-    nav_msgs::Path scaled_path_;
-
-};
-
-int main ( int argc, char **argv ) {
-    ros::init ( argc, argv, "Mono" );
-    ros::start();
-
-    if ( argc != 3 ) {
-        cerr << endl << "Usage: rosrun ORB_SLAM2 Mono path_to_vocabulary path_to_settings" << endl;
-        ros::shutdown();
-        return 1;
-    }
-
-    // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM ( argv[1], argv[2], ORB_SLAM2::System::MONOCULAR, true );
-
-    ImageGrabber igb ( &SLAM );
-
-    ros::NodeHandle nodeHandler;
-
-    ros::Subscriber cam_sub = nodeHandler.subscribe ( "/camera/image_raw", 1, &ImageGrabber::grabImage, &igb );
-    ros::Subscriber scale_sub = nodeHandler.subscribe ( "/scale_estimator/scale", 1, &ImageGrabber::setScale, &igb );
-    ros::Subscriber nav_sub = nodeHandler.subscribe ( "/ardrone/navdata", 10, &ImageGrabber::navCallback, &igb );
-
-    ros::Publisher pointcloud_pub = nodeHandler.advertise<sensor_msgs::PointCloud> ( "/orb/point_cloud", 2 );
-    ros::Publisher pose_unscaled_pub = nodeHandler.advertise<geometry_msgs::PoseStamped> ( "/orb/pose_unscaled", 2 );
-    ros::Publisher pose_scaled_pub = nodeHandler.advertise<geometry_msgs::PoseStamped> ( "/orb/pose_scaled", 2 );
-    ros::Publisher path_pub = nodeHandler.advertise<nav_msgs::Path> ( "/ardrone/path_scaled",2 );
-
-    ros::Rate loop_rate ( 30 );
-    int counter = 0;
-
-    while ( ros::ok() ) {
-        ros::spinOnce();
-        if ( igb.pc_init_  && counter % 30 == 0 ) {
-            pointcloud_pub.publish ( igb.pc_ ); //publish at 1 Hz
-        }
-
-        if ( igb.pose_init_ && igb.tracking_state_ == 2 ) {
-            pose_unscaled_pub.publish ( igb.pose_out_unscaled_ );
-            pose_scaled_pub.publish ( igb.pose_out_scaled_ );
-            igb.updatePathArray();
-            path_pub.publish ( igb.scaled_path_ );
-        }
-
-        counter++;
-        loop_rate.sleep();
-    }
-
-    // Stop all threads
-    SLAM.Shutdown();
-
-    ros::shutdown();
-
-    return 0;
-}
+#include <ardrone_orb_adapter.h>
 
 ImageGrabber::ImageGrabber ( ORB_SLAM2::System *pSLAM ) : mpSLAM_ ( pSLAM ), pc_() {
-        pc_.header.frame_id = "/first_keyframe_cam";
-        pose_out_scaled_.header.frame_id = "odom";
-        pose_out_unscaled_.header.frame_id = "odom";
-        scaled_path_.header.frame_id = "odom";
-    }
-    
+    pc_.header.frame_id = "/first_keyframe_cam";
+    pose_out_scaled_.header.frame_id = "odom";
+    pose_out_unscaled_.header.frame_id = "odom";
+    scaled_path_.header.frame_id = "odom";
+}
+
 void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
 
     // Copy the ros image message to cv::Mat.
@@ -171,7 +72,7 @@ void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
         ROS_ERROR ( "cv_bridge exception: %s", e.what() );
         return;
     }
-    //     Main slam routine. Extracts new pose
+    // Main slam routine. Extracts new pose
     // (from ORB_SLAM2 API)
     // Proccess the given monocular frame
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
@@ -181,90 +82,58 @@ void ImageGrabber::grabImage ( const sensor_msgs::ImageConstPtr &msg ) {
 
     ros::Time t = msg->header.stamp;
 
-    //////////////////////////////////TRANSFORMATIONS//////////////////////////////////////////////////////////////////
-        //To fuse the orb SLAM pose estimate with onboard sensor data, it is
-        //necessary to publish any other sensor data and the orb SLAM data in the same parent frame which is typically
-        //called 'odom'. See REP105 and REP103 on ros.org for further details on the concept.
-        //
-        //The final transformation for the orb SLAM looks like this:
-        //
-        //		odom --> second_keyframe_base_link --> second_keyframe_cam --> first_keyframe_cam
-        //    --> orb_pose_unscaled_cam --> orb_pose_unscaled_base_link
-        //
-        //Odom is defined by the drone on startup (this is not the startup time of the driver node but the time the plug is connected)
-        //Odom is defined with it's x-axis facing north and the negative z-axis aligned to the gravitation vector and must
-        //not be changed at any time afterwards.
-        //
-        //The first and second keyframe transformation is set once the orb slam initializes (meaning it is able to estimate a position
-        //for the first time). It is set to be the transformation from odom to ardrone_base_frontcam (published by the driver).
-        //It is important to mention, that the first transformation, that is actually received from the ORB SLAM algorithm is the
-        //transformation to the SECOND keyframe. There is a need to compensate for this to get a correct pose from the first keyframe on.
-        //
-        //Camera frames always come in a way such that the z axis is pointing forwards while the y axis is
-        //facing downwards. Therefore the transformations to switch frames are here achieved through a manual rotation such that eventually
-        //the orb pose values which are beeing publsihed to a PoseStamped topic represent the correct pose within the odom frame.
-        //See the rqt_tf_tree for further calrification on the single transformations this code is performing.
-        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-     // if points can be tracked then broadcast the pose
+    // if points can be tracked then broadcast the pose
     if ( not Tcw.empty() ) {
         if ( not pc_init_ && isPointCloudValid() ) {
             pc_init_ = true;
             normalizer_ = getAverageDepth();
         }
-
-        if ( not pose_init_ ) { 
-            pose_init_ = true;            
-            initializeTFTree(Tcw);
+        
+        //upon initialization, a correction 
+        if ( not pose_init_ ) {
+            initializeTFTree ( Tcw );
         }
-        
+
         // rescale unscaled orb pose with normalizer
-        tf::Transform orb_pose_unscaled_cam_to_first_keyframe_cam = cvMatToTF(Tcw);
-        orb_pose_unscaled_cam_to_first_keyframe_cam = scaleTF(orb_pose_unscaled_cam_to_first_keyframe_cam , normalizer_);
-        
+        tf::Transform orb_pose_unscaled_cam_to_first_keyframe_cam = cvMatToTF ( Tcw );
+        orb_pose_unscaled_cam_to_first_keyframe_cam = scaleTF ( orb_pose_unscaled_cam_to_first_keyframe_cam , normalizer_ );
+
         // construct unscaled and scaled orb pose in odom frame
         tf::Transform odom_to_pose_out = odom_to_second_keyframe_base_transform_
-                                        * base_link_to_camera_transform_no_translation_
-                                        * second_keyframe_cam_to_first_keyframe_cam_transform_.inverse()
-                                        * orb_pose_unscaled_cam_to_first_keyframe_cam
-                                        * base_link_to_camera_transform_no_translation_.inverse();
-        
-        tf::Transform odom_to_pose_scaled_out = scaleTF(odom_to_pose_out , scale_);
-        
+                                         * base_link_to_camera_transform_no_translation_
+                                         * second_keyframe_cam_to_first_keyframe_cam_transform_.inverse()
+                                         * orb_pose_unscaled_cam_to_first_keyframe_cam
+                                         * base_link_to_camera_transform_no_translation_.inverse();
+
+        tf::Transform odom_to_pose_scaled_out = scaleTF ( odom_to_pose_out , scale_ );
+
         // construct key frame in odom frame
         tf::Transform odom_to_first_keyframe_unscaled = odom_to_second_keyframe_base_transform_
-                                                        * base_link_to_camera_transform_no_translation_
-                                                        * second_keyframe_cam_to_first_keyframe_cam_transform_.inverse();
-        
-        tf::Transform odom_to_first_keyframe_scaled = scaleTF(odom_to_first_keyframe_unscaled, scale_);                          
-        
-        if ( debug_mode_ ) {
-            // odom to second_keyframe_base_link
-            br_.sendTransform ( tf::StampedTransform ( odom_to_second_keyframe_base_transform_, t, "odom", "/second_keyframe_base_link" ) );
+                * base_link_to_camera_transform_no_translation_
+                * second_keyframe_cam_to_first_keyframe_cam_transform_.inverse();
 
-            // second_keyframe_base_link to second_keyframe_cam
-            br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_, t, "/second_keyframe_base_link", "/second_keyframe_cam" ) );
+        tf::Transform odom_to_first_keyframe_scaled = scaleTF ( odom_to_first_keyframe_unscaled, scale_ );
 
-            // second_keyframe_cam to first_keyframe_cam
-            br_.sendTransform ( tf::StampedTransform ( second_keyframe_cam_to_first_keyframe_cam_transform_.inverse(), t, "/second_keyframe_cam", "/first_keyframe_cam" ) );
+        // odom to second_keyframe_base_link
+        br_.sendTransform ( tf::StampedTransform ( odom_to_second_keyframe_base_transform_, t, "odom", "/second_keyframe_base_link" ) );
 
-            // first_keyframe_cam to first_keyframe_base_link
-            br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_.inverse(), t, "/first_keyframe_cam", "/first_keyframe_base_link" ) );
+        // second_keyframe_base_link to second_keyframe_cam
+        br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_, t, "/second_keyframe_base_link", "/second_keyframe_cam" ) );
 
-            // first_keyframe_cam to orb_pose_unscaled_cam
-            br_.sendTransform ( tf::StampedTransform ( orb_pose_unscaled_cam_to_first_keyframe_cam, t, "/first_keyframe_cam", "/orb_pose_unscaled_cam" ) );
+        // second_keyframe_cam to first_keyframe_cam
+        br_.sendTransform ( tf::StampedTransform ( second_keyframe_cam_to_first_keyframe_cam_transform_.inverse(), t, "/second_keyframe_cam", "/first_keyframe_cam" ) );
 
-            // orb_pose_unscaled_cam to orb_pose_unscaled
-            br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_.inverse(), t, "/orb_pose_unscaled_cam", "/orb_pose_unscaled" ) );
+        // first_keyframe_cam to first_keyframe_base_link
+        br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_.inverse(), t, "/first_keyframe_cam", "/first_keyframe_base_link" ) );
 
-            // send orb_pose scaled
-            br_.sendTransform ( tf::StampedTransform ( odom_to_pose_scaled_out , t, "odom", "/orb_pose_scaled" ) );
+        // first_keyframe_cam to orb_pose_unscaled_cam
+        br_.sendTransform ( tf::StampedTransform ( orb_pose_unscaled_cam_to_first_keyframe_cam, t, "/first_keyframe_cam", "/orb_pose_unscaled_cam" ) );
 
-        } else {
-            br_.sendTransform ( tf::StampedTransform ( odom_to_pose_out , t, "odom", "/orb_pose_unscaled" ) );
-            br_.sendTransform ( tf::StampedTransform ( odom_to_pose_scaled_out , t, "odom", "/orb_pose_scaled" ) );
-            br_.sendTransform ( tf::StampedTransform ( odom_to_first_keyframe_scaled , t, "odom", "/first_keyframe_cam" ) );
-        }
-            
+        // orb_pose_unscaled_cam to orb_pose_unscaled
+        br_.sendTransform ( tf::StampedTransform ( base_link_to_camera_transform_no_translation_.inverse(), t, "/orb_pose_unscaled_cam", "/orb_pose_unscaled" ) );
+
+        // send orb_pose scaled
+        br_.sendTransform ( tf::StampedTransform ( odom_to_pose_scaled_out , t, "odom", "/orb_pose_scaled" ) );
 
         writePoseOutUnscaled ( odom_to_pose_out, t );
         writePoseOutScaled ( pose_out_unscaled_, scale_ ); //scale_init already covered in the tf's
@@ -348,6 +217,11 @@ double ImageGrabber::getAverageDepth () {
     float out = tot_z / counter;
 }
 
+void ImageGrabber::setScale ( std_msgs::Float32 msg ) {
+    isPathTracking_ = true;
+    scale_ = msg.data;
+};
+
 tf::Transform ImageGrabber::cvMatToTF ( cv::Mat Tcw ) {
     tf::Transform cam_to_first_keyframe_transform;
     // invert since Tcw (transform from world to camera)
@@ -398,7 +272,7 @@ void ImageGrabber::navCallback ( ardrone_autonomy::Navdata msg ) {
     }
 }
 
-void ImageGrabber::initializeTFTree(cv::Mat Tcw) {
+void ImageGrabber::initializeTFTree ( cv::Mat Tcw ) {
     try {
         tf_listener_.lookupTransform ( "odom", "/ardrone_base_link", ros::Time ( 0 ), odom_to_second_keyframe_base_transform_ );
         tf_listener_.lookupTransform ( "/ardrone_base_link", "/ardrone_base_frontcam", ros::Time ( 0 ), base_link_to_camera_transform_ );
@@ -409,20 +283,21 @@ void ImageGrabber::initializeTFTree(cv::Mat Tcw) {
         second_keyframe_cam_to_first_keyframe_cam_transform_ = cvMatToTF ( Tcw );
 
         odom_to_second_keyframe_base_transform_.setOrigin ( tf::Vector3 ( 0, 0, 0 ) );
-        
-        second_keyframe_cam_to_first_keyframe_cam_transform_ = scaleTF(second_keyframe_cam_to_first_keyframe_cam_transform_, normalizer_);
-        
+
+        second_keyframe_cam_to_first_keyframe_cam_transform_ = scaleTF ( second_keyframe_cam_to_first_keyframe_cam_transform_, normalizer_ );
+
         base_link_to_camera_transform_no_translation_ = base_link_to_camera_transform_;
         base_link_to_camera_transform_no_translation_.setOrigin ( tf::Vector3 ( 0.0, 0.0, 0.0 ) );
+        pose_init_ = true;
 
     } catch ( tf::LookupException e ) {
         cout << e.what() << endl;
+        ROS_WARN("Initialization of transformation chain failed!");
     }
 }
 
-tf::Transform ImageGrabber::scaleTF(tf::Transform T, double normalizer)
-{
-    T.setOrigin(T.getOrigin() / normalizer);
+tf::Transform ImageGrabber::scaleTF ( tf::Transform T, double normalizer ) {
+    T.setOrigin ( T.getOrigin() / normalizer );
     return T;
 }
 
