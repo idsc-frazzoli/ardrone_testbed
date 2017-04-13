@@ -52,7 +52,6 @@ int main ( int argc, char **argv ) {
     while ( ros::ok() ) {
 
         ros::spinOnce();
-
         if ( not scale_est.hasFixedScale() ) {
             scale_est.processQueue();//doesn't do anything if queue size less than 50
             scale_est.estimateScale();

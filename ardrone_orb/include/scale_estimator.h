@@ -65,7 +65,7 @@ public:
     bool fixed_scale_ = false;
     double scale_ = 1; // has units m^-1
     vector<ScaleStruct> scale_vector_;
-    const int max_counter_ = 350;
+    const int max_counter_ = 250;
     int counter_ = 0;
 
     double filterScale ( vector<ScaleStruct> scale_vctr, double ratio, double std_orb, double std_nav , int cut_off );
