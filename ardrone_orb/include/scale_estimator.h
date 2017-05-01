@@ -53,19 +53,19 @@ public:
     bool first_orb_msg_=true;
     bool first_nav_msg_=true;
 
-    // tuning parameters
-    const double ransac_tolerance_ = 0.1;
-    const double orb_tol_min_ = 0;
-    const double nav_tol_min_ = 0.005;
-    const double orb_tol_max_ = 0.1;
-    const double nav_tol_max_ = 0.5;
-    const double std_orb_=0.2;
-    const double std_nav_=0.1;
+    // tuning parameters testing
+    const double ransac_tolerance_ = pow(10,-1.4);
+    const double orb_tol_min_ = 0.02;
+    const double nav_tol_min_ = 0.04;
+    const double orb_tol_max_ = 0.2;
+    const double nav_tol_max_ = 100;
+    const double std_orb_=pow(10,-0.2);
+    const double std_nav_=1;
 
     bool fixed_scale_ = false;
     double scale_ = 1; // has units m^-1
     vector<ScaleStruct> scale_vector_;
-    const int max_counter_ = 250;
+    const int max_counter_ = 160;
     int counter_ = 0;
 
     double filterScale ( vector<ScaleStruct> scale_vctr, double ratio, double std_orb, double std_nav , int cut_off );

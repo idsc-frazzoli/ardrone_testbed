@@ -72,7 +72,7 @@ public:
     inline bool isInlier ( float orb_tol, float orb_max_tol, float nav_tol, float nav_max_tol ) {
         bool is_nav_inlier = fabs ( nav_z_ ) > nav_tol && fabs ( nav_z_ ) < nav_max_tol;
         bool is_orb_inlier = fabs ( orb_z_ ) > orb_tol && fabs ( orb_z_ ) < orb_max_tol;
-        return   is_nav_inlier && is_orb_inlier;
+        return   is_nav_inlier && is_orb_inlier && orb_z_ * nav_z_ > 0;
     }
 
     inline bool operator < ( const ScaleStruct& comp ) const {
