@@ -11,7 +11,7 @@
   <node name="scale_estimation_node" pkg="ardrone_orb" type="scale_estimation_node" output="screen" />
 
 <!-- launch rviz -->
-  <node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find ardrone_orb)/../rviz/master_config.rviz" />
+  <node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find ardrone_planner_utils)/rviz/master_config.rviz" />
 
 </launch>
 

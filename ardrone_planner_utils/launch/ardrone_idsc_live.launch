@@ -6,7 +6,7 @@
   </node>
 
 <!-- launch rviz -->
-  <node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find ardrone_orb)/../rviz/master_config.rviz" />
+  <node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find ardrone_planner_utils)/rviz/master_config.rviz" />
 
 <!-- launch drone driver -->
     <!-- IPv4 address of your drone -->
